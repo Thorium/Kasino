@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>Kasino.Domain</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Cards.fs" />
+    <Compile Include="Combinations.fs" />
+    <Compile Include="Rules.fs" />
+    <Compile Include="Scoring.fs" />
+    <Compile Include="AI.fs" />
+    <Compile Include="GameEngine.fs" />
+  </ItemGroup>
+</Project>

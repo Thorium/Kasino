@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>Kasino.UI</RootNamespace>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <TrimMode>partial</TrimMode>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="CardRenderer.fs" />
+    <Compile Include="InputHandler.fs" />
+    <Compile Include="Button.fs" />
+    <Compile Include="RulesScreen.fs" />
+    <Compile Include="MenuScreen.fs" />
+    <Compile Include="GameScreen.fs" />
+    <Compile Include="ScoreScreen.fs" />
+    <Compile Include="KasinoGame.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FontStashSharp.MonoGame" Version="1.5.4" />
+    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.4.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Kasino.Domain\Kasino.Domain.fsproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Content\cards\**\*.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+</Project>

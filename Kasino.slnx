@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Kasino.Domain/Kasino.Domain.fsproj" />
+    <Project Path="src/Kasino.UI/Kasino.UI.fsproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Kasino.Tests/Kasino.Tests.fsproj" />
+  </Folder>
+</Solution>
