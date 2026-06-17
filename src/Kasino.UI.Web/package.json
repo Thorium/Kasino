@@ -1,0 +1,16 @@
+{
+  "name": "kasino.ui.web",
+  "version": "1.0.0",
+  "description": "Web (Fable + Canvas) front-end for the Kasino card game",
+  "scripts": {
+    "dev": "dotnet fable watch --run npx vite",
+    "build": "dotnet fable && npx vite build"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "vite": "^8.0.0"
+  }
+}

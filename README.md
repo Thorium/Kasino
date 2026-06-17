@@ -1,6 +1,9 @@
 # Kasino - Finnish Card Game
 
 A digital version of the classic Finnish card game Kasino, built with MonoGame.
+There is also [Nu game engine version](https://github.com/Thorium/Nu/tree/finnish-card-game/Projects/Kasino) available.
+
+**▶ [Play online](https://thorium.github.io/Kasino/)** (browser version, no install needed)
 
 ## Game Modes
 
@@ -42,9 +45,10 @@ Full rules are available in-game via the **How to Play** button.
 
 ## Requirements
 
-- [.NET 8.0 SDK](https://dotnet.microsoft.com/download)
+- [.NET 10.0 SDK](https://dotnet.microsoft.com/download)
+- [Node.js](https://nodejs.org/) 20.19+ (only for the web build)
 
-## Build & Run
+## Build & Run (desktop)
 
 ```bash
 dotnet build
@@ -56,3 +60,27 @@ dotnet run --project src/Kasino.UI/Kasino.UI.fsproj
 ```bash
 dotnet test
 ```
+
+## Web version (Fable + Canvas)
+
+`src/Kasino.UI.Web` is a [Fable](https://fable.io/) front-end that reuses
+`Kasino.Domain` unchanged and re-implements the UI on an HTML5 Canvas, so the
+game runs in the browser. The desktop project (`Kasino.UI`) uses MonoGame and is
+not part of the web build.
+
+```bash
+dotnet tool restore                 # installs the Fable compiler (once)
+cd src/Kasino.UI.Web                 # all npm commands run from HERE
+npm install                          # required before dev/build — installs vite locally
+npm run dev                          # dev server with hot reload
+npm run build                        # production build into dist/
+```
+
+> If `npm run dev` fails with `Cannot find package 'vite'`, the dependencies
+> aren't installed in `src/Kasino.UI.Web/node_modules`. Run `npm install` from
+> inside `src/Kasino.UI.Web` (not the repo root). If you have `NODE_ENV` set to
+> `production`, use `npm install --include=dev`.
+
+It deploys automatically to GitHub Pages on every push to `main` via
+`.github/workflows/deploy.yml`. Enable **Settings → Pages → Source: GitHub
+Actions** in the repository to publish it.

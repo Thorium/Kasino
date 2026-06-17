@@ -36,7 +36,14 @@ module GameEngine =
 
     /// Total deal rounds based on player count.
     /// 52 cards: first deal = 4*players + 4 table, rest = 4*players each.
-    let totalDealRounds (playerCount: int) = 12 / playerCount
+    /// Only 2-4 players divide the 48 dealt cards evenly; other counts fall
+    /// back to integer division (guarded against divide-by-zero).
+    let totalDealRounds (playerCount: int) =
+        match playerCount with
+        | 2 -> 6
+        | 3 -> 4
+        | 4 -> 3
+        | n -> 12 / max 1 n
 
     /// Create initial players.
     let createPlayers (config: GameConfig) =

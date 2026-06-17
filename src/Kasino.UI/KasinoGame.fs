@@ -91,37 +91,50 @@ type KasinoGame() as this =
         // Load font using FontStashSharp from a system TTF
         fontSystem <- new FontSystem()
 
-        // Try common Windows font paths
-        let fontPaths =
-            [ @"C:\Windows\Fonts\segoeui.ttf"
+        // Find a usable TTF across Windows, Linux, and macOS. Preferred fonts
+        // first; then a recursive scan of the platform font directories.
+        let preferredFonts =
+            [ // Windows
+              @"C:\Windows\Fonts\segoeui.ttf"
               @"C:\Windows\Fonts\arial.ttf"
               @"C:\Windows\Fonts\consola.ttf"
-              @"C:\Windows\Fonts\tahoma.ttf" ]
+              @"C:\Windows\Fonts\tahoma.ttf"
+              // Linux
+              "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+              "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
+              "/usr/share/fonts/truetype/freefont/FreeSans.ttf"
+              "/usr/share/fonts/TTF/DejaVuSans.ttf"
+              // macOS
+              "/System/Library/Fonts/Supplemental/Arial.ttf"
+              "/Library/Fonts/Arial.ttf" ]
+
+        let fontDirs =
+            [ @"C:\Windows\Fonts"
+              "/usr/share/fonts"
+              "/usr/local/share/fonts"
+              "/Library/Fonts"
+              "/System/Library/Fonts"
+              Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".fonts") ]
+
+        let fontFromDirs () =
+            fontDirs
+            |> List.filter Directory.Exists
+            |> List.tryPick (fun dir ->
+                try Directory.GetFiles(dir, "*.ttf", SearchOption.AllDirectories) |> Array.tryHead
+                with _ -> None)
 
         let fontPath =
-            fontPaths |> List.tryFind File.Exists
+            match preferredFonts |> List.tryFind File.Exists with
+            | Some p -> Some p
+            | None -> fontFromDirs ()
 
         match fontPath with
         | Some path ->
-            let fontData = File.ReadAllBytes(path)
-            fontSystem.AddFont(fontData)
+            fontSystem.AddFont(File.ReadAllBytes(path))
         | None ->
-            // No system font found — try all fonts in the Windows\Fonts directory
-            let fontsDir = @"C:\Windows\Fonts"
-            let fallbackFont =
-                if Directory.Exists(fontsDir) then
-                    Directory.GetFiles(fontsDir, "*.ttf") |> Array.tryHead
-                else
-                    None
-            match fallbackFont with
-            | Some path ->
-                let fontData = File.ReadAllBytes(path)
-                fontSystem.AddFont(fontData)
-            | None ->
-                // Absolute last resort: create a minimal font system that won't crash
-                // FontStashSharp requires at least one font; without it GetFont throws.
-                // Re-raise as a clear error instead of a cryptic NullReferenceException.
-                failwith "No TTF font file found on this system. Please place a .ttf file in C:\\Windows\\Fonts or alongside the executable."
+            // FontStashSharp requires at least one font; surface a clear error
+            // instead of a cryptic NullReferenceException at GetFont.
+            failwith "No TTF font found. Install a system font (e.g. DejaVu/Liberation on Linux) or place a .ttf alongside the executable."
 
         font <- fontSystem.GetFont(24.0f)
         fontSmall <- fontSystem.GetFont(18.0f)
@@ -195,22 +208,20 @@ type KasinoGame() as this =
                 // Return to main menu
                 screen <- Menu MenuScreen.initial
             else
-
-            match newGameState.Phase with
-            | GameScreen.RoundOver when newGameState.ContinueClicked ->
-                // Show score screen (triggered by button tap or Enter)
-                let finalState = newGameState.GameState
-                let scoreScreen =
-                    ScoreScreen.create
-                        finalState.Players
-                        newGameState.CumulativeScores
-                        newGameState.Config.Variant
-                        newGameState.RoundNumber
-                        newGameState.Config.TargetScore
-                screen <- Scores scoreScreen
-
-            | _ ->
-                screen <- Playing newGameState
+                match newGameState.Phase with
+                | GameScreen.RoundOver when newGameState.ContinueClicked ->
+                    // Show score screen (triggered by button tap or Enter)
+                    let finalState = newGameState.GameState
+                    let scoreScreen =
+                        ScoreScreen.create
+                            finalState.Players
+                            newGameState.CumulativeScores
+                            newGameState.Config.Variant
+                            newGameState.RoundNumber
+                            newGameState.Config.TargetScore
+                    screen <- Scores scoreScreen
+                | _ ->
+                    screen <- Playing newGameState
 
         | Scores scoreState ->
             let newScoreState = ScoreScreen.update input (screenW()) (screenH()) scoreState
@@ -245,9 +256,10 @@ type KasinoGame() as this =
             else
                 screen <- Rules (newRules, returnTo)
 
-        // Exit on Escape from menu
+        // Exit on Escape from menu (edge-detected, so a single Escape held
+        // while returning to the menu from gameplay does not also exit).
         match screen with
-        | Menu _ when Keyboard.GetState().IsKeyDown(Keys.Escape) ->
+        | Menu _ when input.Keyboard.IsEscapePressed ->
             this.Exit()
         | _ -> ()
 

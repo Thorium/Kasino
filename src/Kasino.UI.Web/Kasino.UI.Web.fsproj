@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net10.0</TargetFramework>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Content Include="index.html" />
+        <Content Include="styles.css" />
+        <TypeScriptCompile Include="vite.config.ts" />
+        <None Include="package.json" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Include="Types.fs" />
+        <Compile Include="Canvas.fs" />
+        <Compile Include="Input.fs" />
+        <Compile Include="CardRenderer.fs" />
+        <Compile Include="Button.fs" />
+        <Compile Include="RulesScreen.fs" />
+        <Compile Include="MenuScreen.fs" />
+        <Compile Include="ScoreScreen.fs" />
+        <Compile Include="GameScreen.fs" />
+        <Compile Include="Program.fs" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Fable.Browser.Dom" Version="2.20.0" />
+        <PackageReference Include="Fable.Core" Version="5.0.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Kasino.Domain\Kasino.Domain.fsproj" />
+    </ItemGroup>
+
+</Project>

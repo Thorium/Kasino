@@ -47,14 +47,19 @@ module AI =
         let result, _ = Rules.resolveCapture handCard option tableCards
         match result with
         | Capture(_, captured, isSweep) ->
-            let scoreFn =
-                Cards.scoringValueInContext
+            // Direct points sum per card; the most-cards/most-spades race
+            // bonuses are counted once for the whole capture (not per card).
+            let directPts = captured |> List.sumBy Cards.directValue
+            let capturedSpades = captured |> List.filter Cards.isSpade |> List.length
+            let raceBonus =
+                Cards.captureRaceValue
                     ctx.MyCards ctx.MySpades
                     ctx.OpponentCards ctx.OpponentSpades
                     ctx.CardsRemaining
+                    captured.Length capturedSpades
             { HandCard       = handCard
               Result         = result
-              PointValue     = (captured |> List.sumBy scoreFn) + (if isSweep then Rules.sweepBonus else 0.0)
+              PointValue     = directPts + raceBonus + (if isSweep then Rules.sweepBonus else 0.0)
               CardsCaptured  = captured.Length
               IsSweep        = isSweep
               CaptureOptions = []
