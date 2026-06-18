@@ -322,8 +322,8 @@ type KasinoGame() as this =
             GameScreen.draw spriteBatch font lastInput tex gameState (screenW()) (screenH())
         | Scores scoreState, _ ->
             ScoreScreen.draw spriteBatch font lastInput scoreState (screenW()) (screenH())
-        | Rules (rulesState, _), _ ->
-            RulesScreen.draw spriteBatch font lastInput rulesState (screenW()) (screenH())
+        | Rules (rulesState, _), texOpt ->
+            RulesScreen.draw spriteBatch font texOpt lastInput rulesState (screenW()) (screenH())
         | Options (optionsState, _), _ ->
             OptionsScreen.draw spriteBatch font lastInput optionsState (screenW()) (screenH())
         | _ -> ()

@@ -3,16 +3,16 @@ namespace Kasino.UI
 open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Graphics
 open FontStashSharp
+open Kasino.Domain
 
 // ─────────────────────────────────────────────────────────────
-// Rules / Help screen: 6 pages explaining Finnish Kasino.
-// Touch-friendly navigation with Previous/Next/Back buttons.
+// Rules / Help screen explaining Finnish Kasino.
+// Mixes text pages with VISUAL pages that show real card images
+// so new / visual players can see how capturing and scoring work.
 // Accessible from the main menu and in-game "?" button.
 // ─────────────────────────────────────────────────────────────
 
 module RulesScreen =
-
-    let private totalPages = 6
 
     type RulesState =
         { CurrentPage: int
@@ -22,32 +22,15 @@ module RulesScreen =
         { CurrentPage = 0
           BackClicked = false }
 
-    // ── Button helpers ──────────────────────────────────
+    // ── Page model ──────────────────────────────────────
+    // A page is either a block of text, or a visual page (drawn from
+    // card images) identified by a small id handled in drawVisual.
+    type private Page =
+        | TextPage of title: string * lines: string list
+        | VisualPage of title: string * id: int
 
-    let private backButton (screenW: int) (screenH: int) =
-        Button.create "Back" 20 (screenH - 70) 140 52 (Color(120, 40, 40)) Color.White
-
-    let private prevButton (screenW: int) (screenH: int) =
-        let cx = screenW / 2
-        Button.create "Previous" (cx - 250) (screenH - 70) 160 52 (Color(60, 60, 100)) Color.White
-
-    let private nextButton (screenW: int) (screenH: int) =
-        let cx = screenW / 2
-        Button.create "Next" (cx + 90) (screenH - 70) 160 52 (Color(40, 100, 40)) Color.White
-
-    // ── Page content ────────────────────────────────────
-
-    let private pageTitle = function
-        | 0 -> "Game Overview"
-        | 1 -> "Card Values"
-        | 2 -> "Capturing Cards"
-        | 3 -> "Sweeps & Round End"
-        | 4 -> "Scoring"
-        | 5 -> "Laistokasino"
-        | _ -> ""
-
-    let private pageLines = function
-        | 0 ->
+    let private pages : Page[] =
+        [| TextPage("Game Overview",
             [ "Kasino is a classic Finnish card game for 2-4 players."
               "The goal is to capture cards from the table by matching"
               "values from your hand."
@@ -61,8 +44,8 @@ module RulesScreen =
               "The first player to reach 16 cumulative points wins!"
               ""
               "The game uses a standard 52-card deck (no jokers)."
-              "2 players: 6 deal waves.  3 players: 4.  4 players: 3." ]
-        | 1 ->
+              "2 players: 6 deal waves.  3 players: 4.  4 players: 3." ])
+           TextPage("Card Values",
             [ "Cards have TWO different value systems:"
               ""
               "TABLE VALUE (for summing on the table):"
@@ -79,8 +62,11 @@ module RulesScreen =
               "  a King + Ace on the table (13 + 1 = 14),"
               "  or a 9 + 5 (= 14), or even 8 + 5 + 1 (= 14)."
               ""
-              "Kings can only be captured by Kings (table value 13)." ]
-        | 2 ->
+              "A lone King is captured only by another King, but a King on"
+              "the table can also be swept up inside a bigger combo"
+              "(e.g. King + Ace = 14, captured by an Ace)." ])
+           VisualPage("Card Values at a Glance", 1)
+           TextPage("Capturing Cards",
             [ "When you play a card, ALL non-overlapping subsets of"
               "table cards that sum to your hand card's value must"
               "be captured simultaneously."
@@ -97,8 +83,10 @@ module RulesScreen =
               "CAPTURE PREVIEW (green/yellow highlights):"
               "  When you select a hand card, table cards light up:"
               "  Green = definitely captured (in all options)"
-              "  Yellow = captured in some options (choice needed)" ]
-        | 3 ->
+              "  Yellow = captured in some options (choice needed)" ])
+           VisualPage("Capturing with a 9", 2)
+           VisualPage("Take or Leave", 3)
+           TextPage("Sweeps & Round End",
             [ "SWEEP: If your capture takes ALL remaining table cards,"
               "that's a Sweep! Sweeps earn bonus points."
               ""
@@ -114,8 +102,8 @@ module RulesScreen =
               "  Remaining 48 cards dealt in waves of 4 per player:"
               "    2 players: 6 waves  (6 x 4 x 2 = 48)"
               "    3 players: 4 waves  (4 x 4 x 3 = 48)"
-              "    4 players: 3 waves  (3 x 4 x 4 = 48)" ]
-        | 4 ->
+              "    4 players: 3 waves  (3 x 4 x 4 = 48)" ])
+           TextPage("Scoring",
             [ "SCORING (per round):"
               ""
               "  Most cards captured .... 1 point"
@@ -134,8 +122,9 @@ module RulesScreen =
               ""
               "TARGET: First player to reach 16 cumulative points wins."
               "If multiple players reach 16 in the same round,"
-              "the highest score wins." ]
-        | 5 ->
+              "the highest score wins." ])
+           VisualPage("Scoring Cards", 4)
+           TextPage("Laistokasino",
             [ "LAISTOKASINO (also called Misa-Kasino):"
               ""
               "The rules are identical, but the goal is REVERSED:"
@@ -146,14 +135,110 @@ module RulesScreen =
               ""
               "STRATEGY TIPS:"
               "  - Avoid capturing Aces and special cards."
+              "  - Track which specials (Aces, 2♠, 10♦) are gone or still to come."
+              "  - Keep any card on the table, so an opponent can't simply"
+              "    park a special card on an empty table."
               "  - Don't accumulate too many cards or spades."
               "  - Sweeps hurt you! Try to leave cards on the table."
               "  - Sometimes placing a card is better than capturing."
               "  - Force opponents to sweep by leaving few table cards."
-              ""
-              "Laistokasino requires a very different mindset"
-              "from Standard Kasino. Think defensively!" ]
-        | _ -> []
+              "  - Usually play your bigger non-capturing cards first."
+              "  - Beware feeding a special: with a 10 on the table, adding a 6"
+              "    makes 16, so an opponent's 10♦ is forced to grab it." ]) |]
+
+    let private totalPages = pages.Length
+
+    let private pageTitle page =
+        match pages.[page] with
+        | TextPage(t, _) -> t
+        | VisualPage(t, _) -> t
+
+    // ── Button helpers ──────────────────────────────────
+
+    let private backButton (screenW: int) (screenH: int) =
+        Button.create "Back" 20 (screenH - 70) 140 52 (Color(120, 40, 40)) Color.White
+
+    let private prevButton (screenW: int) (screenH: int) =
+        let cx = screenW / 2
+        Button.create "Previous" (cx - 250) (screenH - 70) 160 52 (Color(60, 60, 100)) Color.White
+
+    let private nextButton (screenW: int) (screenH: int) =
+        let cx = screenW / 2
+        Button.create "Next" (cx + 90) (screenH - 70) 160 52 (Color(40, 100, 40)) Color.White
+
+    // ── Visual-page drawing helpers ─────────────────────
+    let private cw = 60
+    let private ch = 76
+    let private card s r : Card = { Suit = s; Rank = r }
+
+    let private centerLine (sb: SpriteBatch) (font: SpriteFontBase) (cx: float32) (text: string) (y: int) (col: Color) =
+        let sz = font.MeasureString(text)
+        sb.DrawString(font, text, Vector2(cx - sz.X / 2.0f, float32 y), col) |> ignore
+
+    let private drawCardAt (sb: SpriteBatch) (tex: CardRenderer.CardTextures) (c: Card) (x: int) (y: int) =
+        sb.Draw(CardRenderer.getTexture tex c, Rectangle(x, y, cw, ch), Color.White)
+
+    /// A centered row of cards, each with a caption beneath it.
+    let private drawRow (sb: SpriteBatch) font tex (cx: float32) (items: (Card * string) list) (y: int) (col: Color) =
+        let gap = 64
+        let n = items.Length
+        let totalW = n * cw + (max 0 (n - 1)) * gap
+        let startX = int cx - totalW / 2
+        items
+        |> List.iteri (fun i (c, lbl) ->
+            let x = startX + i * (cw + gap)
+            drawCardAt sb tex c x y
+            let sz = (font: SpriteFontBase).MeasureString(lbl)
+            sb.DrawString(font, lbl, Vector2(float32 x + float32 cw / 2.0f - sz.X / 2.0f, float32 (y + ch + 6)), col) |> ignore)
+
+    /// A group of cards laid left-to-right at (x, y), with a label to the right.
+    let private drawGroup (sb: SpriteBatch) (font: SpriteFontBase) tex (cards: Card list) (x: int) (y: int) (label: string) (col: Color) =
+        let gap = 10
+        cards |> List.iteri (fun i c -> drawCardAt sb tex c (x + i * (cw + gap)) y)
+        let tx = x + cards.Length * (cw + gap) + 14
+        sb.DrawString(font, label, Vector2(float32 tx, float32 (y + ch / 2 - 12)), col) |> ignore
+
+    let private drawVisual (sb: SpriteBatch) (font: SpriteFontBase) tex (cx: float32) (vid: int) =
+        match vid with
+        | 1 -> // Card values & special cards
+            centerLine sb font cx "Every card has a TABLE value and a HAND value." 116 Color.White
+            centerLine sb font cx "Add values on the table; spend HAND value to capture." 142 Color.LightGray
+            centerLine sb font cx "Normal cards: each card's value = its face value" 184 Color.Gold
+            drawRow sb font tex cx [ card Clubs Four, "worth 4"; card Hearts Seven, "worth 7"; card Spades King, "worth 13" ] 206 Color.White
+            centerLine sb font cx "Three special cards have EXTRA capture power:" 330 Color.Gold
+            drawRow sb font tex cx
+                [ card Diamonds Ace, "Ace = 14"
+                  card Spades Two, "2♠ = 15"
+                  card Diamonds Ten, "10♦ = 16" ] 352 Color.LightGreen
+        | 2 -> // Capturing with a 9
+            centerLine sb font cx "You play a 9 from your hand." 116 Color.White
+            centerLine sb font cx "It captures any group of table cards that ADDS UP to 9." 142 Color.LightGray
+            let gx = int cx - 250
+            drawGroup sb font tex [ card Hearts Nine ] gx 178 "<-  the 9 you play from your hand" Color.Gold
+            drawGroup sb font tex [ card Clubs Nine ] gx 272 "a 9          = 9      captured" Color.LimeGreen
+            drawGroup sb font tex [ card Spades Three; card Diamonds Six ] gx 362 "3 + 6     = 9      captured" Color.LimeGreen
+            drawGroup sb font tex [ card Hearts Eight ] gx 452 "8 alone is not 9   ->   it stays" Color.LightSalmon
+            centerLine sb font cx "One 9 grabs BOTH matching groups at once (here: 3 cards)." 560 Color.White
+        | 3 -> // Take or leave (standard vs laisto)
+            centerLine sb font cx "Your 9 CAN capture the 9 on the table. Must you?" 116 Color.White
+            let gx = int cx - 110
+            drawGroup sb font tex [ card Hearts Nine; card Clubs Nine ] gx 150 "hand 9  +  table 9" Color.Gold
+            centerLine sb font cx "STANDARD KASINO  -  capturing is OPTIONAL" 274 Color.LimeGreen
+            centerLine sb font cx "You may take the 9, or simply place a card on the table." 302 Color.LightGray
+            centerLine sb font cx "LAISTOKASINO  -  capturing is FORCED" 362 Color.LightSalmon
+            centerLine sb font cx "If a capture is possible, you MUST take it." 390 Color.LightGray
+            centerLine sb font cx "(In Laisto you try NOT to collect cards, so a forced take hurts.)" 424 Color.Gray
+        | 4 -> // Scoring cards
+            centerLine sb font cx "Most points come from special cards and majorities:" 116 Color.White
+            let gx = int cx - 250
+            drawGroup sb font tex [ card Diamonds Ten ] gx 150 "10♦  =  2 points" Color.Gold
+            drawGroup sb font tex [ card Spades Two ] gx 240 "2♠   =  1 point" Color.Gold
+            drawGroup sb font tex
+                [ card Spades Ace; card Hearts Ace; card Diamonds Ace; card Clubs Ace ]
+                gx 330 "each Ace = 1 point  (4 total)" Color.White
+            drawGroup sb font tex [ card Spades Four; card Spades Seven; card Spades Nine ] gx 420 "most Spades = 2 points" Color.White
+            centerLine sb font cx "Most cards = 1 point          Each sweep = 1 point" 540 Color.LightGray
+        | _ -> ()
 
     // ── Update ──────────────────────────────────────────
 
@@ -174,7 +259,7 @@ module RulesScreen =
 
     // ── Draw ────────────────────────────────────────────
 
-    let draw (sb: SpriteBatch) (font: SpriteFontBase) (input: InputHandler.InputState) (state: RulesState) (screenW: int) (screenH: int) =
+    let draw (sb: SpriteBatch) (font: SpriteFontBase) (texOpt: CardRenderer.CardTextures option) (input: InputHandler.InputState) (state: RulesState) (screenW: int) (screenH: int) =
         let cx = float32 screenW / 2.0f
 
         let drawCentered (text: string) (y: int) (color: Color) =
@@ -185,8 +270,7 @@ module RulesScreen =
         drawCentered "How to Play Kasino" 20 Color.Gold
 
         // Page title
-        let title = pageTitle state.CurrentPage
-        drawCentered title 55 Color.White
+        drawCentered (pageTitle state.CurrentPage) 55 Color.White
 
         // Page indicator
         let indicator = $"Page {state.CurrentPage + 1} / {totalPages}"
@@ -196,18 +280,22 @@ module RulesScreen =
         let lineTex = CardRenderer.getCachedColorTexture (sb.GraphicsDevice) Color.DarkGray
         sb.Draw(lineTex, Rectangle(40, 100, screenW - 80, 1), Color.White)
 
-        // Body text
-        let lines = pageLines state.CurrentPage
-        let lineH = 22
-        let startY = 115
-        for i in 0 .. lines.Length - 1 do
-            let line = lines[i]
-            let y = startY + i * lineH
-            let color =
-                if line.StartsWith("  ") then Color.LightGray
-                elif line = "" then Color.Transparent
-                else Color.White
-            sb.DrawString(font, line, Vector2(50.0f, float32 y), color) |> ignore
+        match pages.[state.CurrentPage] with
+        | TextPage(_, lines) ->
+            let lineH = 22
+            let startY = 115
+            for i in 0 .. lines.Length - 1 do
+                let line = lines[i]
+                let y = startY + i * lineH
+                let color =
+                    if line.StartsWith("  ") then Color.LightGray
+                    elif line = "" then Color.Transparent
+                    else Color.White
+                sb.DrawString(font, line, Vector2(50.0f, float32 y), color) |> ignore
+        | VisualPage(_, vid) ->
+            match texOpt with
+            | Some tex -> drawVisual sb font tex cx vid
+            | None -> drawCentered "Loading cards..." 300 Color.Gray
 
         // Navigation buttons
         Button.draw sb font input (backButton screenW screenH)

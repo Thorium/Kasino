@@ -1,13 +1,15 @@
 namespace Kasino.UI.Web
 
+open Kasino.Domain
+
 // ─────────────────────────────────────────────────────────────
-// Rules / Help screen: 6 pages explaining Finnish Kasino.
+// Rules / Help screen explaining Finnish Kasino.
+// Mixes text pages with VISUAL pages that show real card images
+// so new / visual players can see how capturing and scoring work.
 // Touch-friendly navigation with Previous/Next/Back buttons.
 // ─────────────────────────────────────────────────────────────
 
 module RulesScreen =
-
-    let private totalPages = 6
 
     type RulesState =
         { CurrentPage: int
@@ -15,32 +17,15 @@ module RulesScreen =
 
     let create () = { CurrentPage = 0; BackClicked = false }
 
-    // ── Button helpers ──────────────────────────────────
-    let private backButton (_screenW: int) (screenH: int) =
-        Button.create "Back" 20 (screenH - 70) 140 52 (Color.rgb 120 40 40) Color.White
+    // ── Page model ──────────────────────────────────────
+    // A page is either a block of text, or a visual page (drawn from
+    // card images) identified by a small id handled in drawVisual.
+    type private Page =
+        | TextPage of title: string * lines: string list
+        | VisualPage of title: string * id: int
 
-    let private prevButton (screenW: int) (screenH: int) =
-        let cx = screenW / 2
-        Button.create "Previous" (cx - 250) (screenH - 70) 160 52 (Color.rgb 60 60 100) Color.White
-
-    let private nextButton (screenW: int) (screenH: int) =
-        let cx = screenW / 2
-        Button.create "Next" (cx + 90) (screenH - 70) 160 52 (Color.rgb 40 100 40) Color.White
-
-    // ── Page content ────────────────────────────────────
-    let private pageTitle =
-        function
-        | 0 -> "Game Overview"
-        | 1 -> "Card Values"
-        | 2 -> "Capturing Cards"
-        | 3 -> "Sweeps & Round End"
-        | 4 -> "Scoring"
-        | 5 -> "Laistokasino"
-        | _ -> ""
-
-    let private pageLines =
-        function
-        | 0 ->
+    let private pages : Page[] =
+        [| TextPage("Game Overview",
             [ "Kasino is a classic Finnish card game for 2-4 players."
               "The goal is to capture cards from the table by matching"
               "values from your hand."
@@ -54,8 +39,8 @@ module RulesScreen =
               "The first player to reach 16 cumulative points wins!"
               ""
               "The game uses a standard 52-card deck (no jokers)."
-              "2 players: 6 deal waves.  3 players: 4.  4 players: 3." ]
-        | 1 ->
+              "2 players: 6 deal waves.  3 players: 4.  4 players: 3." ])
+           TextPage("Card Values",
             [ "Cards have TWO different value systems:"
               ""
               "TABLE VALUE (for summing on the table):"
@@ -72,8 +57,11 @@ module RulesScreen =
               "  a King + Ace on the table (13 + 1 = 14),"
               "  or a 9 + 5 (= 14), or even 8 + 5 + 1 (= 14)."
               ""
-              "Kings can only be captured by Kings (table value 13)." ]
-        | 2 ->
+              "A lone King is captured only by another King, but a King on"
+              "the table can also be swept up inside a bigger combo"
+              "(e.g. King + Ace = 14, captured by an Ace)." ])
+           VisualPage("Card Values at a Glance", 1)
+           TextPage("Capturing Cards",
             [ "When you play a card, ALL non-overlapping subsets of"
               "table cards that sum to your hand card's value must"
               "be captured simultaneously."
@@ -90,8 +78,10 @@ module RulesScreen =
               "CAPTURE PREVIEW (green/yellow highlights):"
               "  When you select a hand card, table cards light up:"
               "  Green = definitely captured (in all options)"
-              "  Yellow = captured in some options (choice needed)" ]
-        | 3 ->
+              "  Yellow = captured in some options (choice needed)" ])
+           VisualPage("Capturing with a 9", 2)
+           VisualPage("Take or Leave", 3)
+           TextPage("Sweeps & Round End",
             [ "SWEEP: If your capture takes ALL remaining table cards,"
               "that's a Sweep! Sweeps earn bonus points."
               ""
@@ -107,8 +97,8 @@ module RulesScreen =
               "  Remaining 48 cards dealt in waves of 4 per player:"
               "    2 players: 6 waves  (6 x 4 x 2 = 48)"
               "    3 players: 4 waves  (4 x 4 x 3 = 48)"
-              "    4 players: 3 waves  (3 x 4 x 4 = 48)" ]
-        | 4 ->
+              "    4 players: 3 waves  (3 x 4 x 4 = 48)" ])
+           TextPage("Scoring",
             [ "SCORING (per round):"
               ""
               "  Most cards captured .... 1 point"
@@ -127,8 +117,9 @@ module RulesScreen =
               ""
               "TARGET: First player to reach 16 cumulative points wins."
               "If multiple players reach 16 in the same round,"
-              "the highest score wins." ]
-        | 5 ->
+              "the highest score wins." ])
+           VisualPage("Scoring Cards", 4)
+           TextPage("Laistokasino",
             [ "LAISTOKASINO (also called Misa-Kasino):"
               ""
               "The rules are identical, but the goal is REVERSED:"
@@ -139,14 +130,109 @@ module RulesScreen =
               ""
               "STRATEGY TIPS:"
               "  - Avoid capturing Aces and special cards."
+              "  - Track which specials (Aces, 2♠, 10♦) are gone or still to come."
+              "  - Keep any card on the table, so an opponent can't simply"
+              "    park a special card on an empty table."
               "  - Don't accumulate too many cards or spades."
               "  - Sweeps hurt you! Try to leave cards on the table."
               "  - Sometimes placing a card is better than capturing."
               "  - Force opponents to sweep by leaving few table cards."
-              ""
-              "Laistokasino requires a very different mindset"
-              "from Standard Kasino. Think defensively!" ]
-        | _ -> []
+              "  - Usually play your bigger non-capturing cards first."
+              "  - Beware feeding a special: with a 10 on the table, adding a 6"
+              "    makes 16, so an opponent's 10♦ is forced to grab it." ]) |]
+
+    let private totalPages = pages.Length
+
+    let private pageTitle page =
+        match pages.[page] with
+        | TextPage(t, _) -> t
+        | VisualPage(t, _) -> t
+
+    // ── Button helpers ──────────────────────────────────
+    let private backButton (_screenW: int) (screenH: int) =
+        Button.create "Back" 20 (screenH - 70) 140 52 (Color.rgb 120 40 40) Color.White
+
+    let private prevButton (screenW: int) (screenH: int) =
+        let cx = screenW / 2
+        Button.create "Previous" (cx - 250) (screenH - 70) 160 52 (Color.rgb 60 60 100) Color.White
+
+    let private nextButton (screenW: int) (screenH: int) =
+        let cx = screenW / 2
+        Button.create "Next" (cx + 90) (screenH - 70) 160 52 (Color.rgb 40 100 40) Color.White
+
+    // ── Visual-page drawing helpers ─────────────────────
+    let private cw = 60
+    let private ch = 76
+    let private card s r : Card = { Suit = s; Rank = r }
+
+    let private centerLine (g: Gfx) (cx: float) (text: string) (y: int) (col: Color) =
+        let sz = Gfx.measure g text
+        Gfx.fillText g text (cx - sz.X / 2.0) (float y) col
+
+    let private drawCardAt (g: Gfx) (tex: CardRenderer.CardTextures) (c: Card) (x: int) (y: int) =
+        Gfx.drawImage g (CardRenderer.getTexture tex c) x y cw ch
+
+    /// A centered row of cards, each with a caption beneath it.
+    let private drawRow (g: Gfx) tex (cx: float) (items: (Card * string) list) (y: int) (col: Color) =
+        let gap = 64
+        let n = items.Length
+        let totalW = n * cw + (max 0 (n - 1)) * gap
+        let startX = int cx - totalW / 2
+        items
+        |> List.iteri (fun i (c, lbl) ->
+            let x = startX + i * (cw + gap)
+            drawCardAt g tex c x y
+            let sz = Gfx.measure g lbl
+            Gfx.fillText g lbl (float x + float cw / 2.0 - sz.X / 2.0) (float (y + ch + 6)) col)
+
+    /// A group of cards laid left-to-right at (x, y), with a label to the right.
+    let private drawGroup (g: Gfx) tex (cards: Card list) (x: int) (y: int) (label: string) (col: Color) =
+        let gap = 10
+        cards |> List.iteri (fun i c -> drawCardAt g tex c (x + i * (cw + gap)) y)
+        let tx = x + cards.Length * (cw + gap) + 14
+        Gfx.fillText g label (float tx) (float (y + ch / 2 - 12)) col
+
+    let private drawVisual (g: Gfx) tex (cx: float) (vid: int) =
+        match vid with
+        | 1 -> // Card values & special cards
+            centerLine g cx "Every card has a TABLE value and a HAND value." 116 Color.White
+            centerLine g cx "Add values on the table; spend HAND value to capture." 142 Color.LightGray
+            centerLine g cx "Normal cards: each card's value = its face value" 184 Color.Gold
+            drawRow g tex cx [ card Clubs Four, "worth 4"; card Hearts Seven, "worth 7"; card Spades King, "worth 13" ] 206 Color.White
+            centerLine g cx "Three special cards have EXTRA capture power:" 330 Color.Gold
+            drawRow g tex cx
+                [ card Diamonds Ace, "Ace = 14"
+                  card Spades Two, "2♠ = 15"
+                  card Diamonds Ten, "10♦ = 16" ] 352 Color.LightGreen
+        | 2 -> // Capturing with a 9
+            centerLine g cx "You play a 9 from your hand." 116 Color.White
+            centerLine g cx "It captures any group of table cards that ADDS UP to 9." 142 Color.LightGray
+            let gx = int cx - 250
+            drawGroup g tex [ card Hearts Nine ] gx 178 "<-  the 9 you play from your hand" Color.Gold
+            drawGroup g tex [ card Clubs Nine ] gx 272 "a 9          = 9      captured" Color.LimeGreen
+            drawGroup g tex [ card Spades Three; card Diamonds Six ] gx 362 "3 + 6     = 9      captured" Color.LimeGreen
+            drawGroup g tex [ card Hearts Eight ] gx 452 "8 alone is not 9   ->   it stays" Color.LightSalmon
+            centerLine g cx "One 9 grabs BOTH matching groups at once (here: 3 cards)." 560 Color.White
+        | 3 -> // Take or leave (standard vs laisto)
+            centerLine g cx "Your 9 CAN capture the 9 on the table. Must you?" 116 Color.White
+            let gx = int cx - 110
+            drawGroup g tex [ card Hearts Nine; card Clubs Nine ] gx 150 "hand 9  +  table 9" Color.Gold
+            centerLine g cx "STANDARD KASINO  -  capturing is OPTIONAL" 274 Color.LimeGreen
+            centerLine g cx "You may take the 9, or simply place a card on the table." 302 Color.LightGray
+            centerLine g cx "LAISTOKASINO  -  capturing is FORCED" 362 Color.LightSalmon
+            centerLine g cx "If a capture is possible, you MUST take it." 390 Color.LightGray
+            centerLine g cx "(In Laisto you try NOT to collect cards, so a forced take hurts.)" 424 Color.Gray
+        | 4 -> // Scoring cards
+            centerLine g cx "Most points come from special cards and majorities:" 116 Color.White
+            let gx = int cx - 250
+            drawGroup g tex [ card Diamonds Ten ] gx 150 "10♦  =  2 points" Color.Gold
+            drawGroup g tex [ card Spades Two ] gx 240 "2♠   =  1 point" Color.Gold
+            drawGroup g tex
+                [ card Spades Ace; card Hearts Ace; card Diamonds Ace; card Clubs Ace ]
+                gx 330 "each Ace = 1 point  (4 total)" Color.White
+            drawGroup g tex [ card Spades Four; card Spades Seven; card Spades Nine ] gx 420 "most Spades = 2 points" Color.White
+            centerLine g cx "Most cards = 1 point          Each sweep = 1 point" 540 Color.LightGray
+        | _ -> ()
 
     // ── Update ──────────────────────────────────────────
     let update (input: Input.InputState) (screenW: int) (screenH: int) (state: RulesState) =
@@ -164,7 +250,7 @@ module RulesScreen =
             { state with CurrentPage = page }
 
     // ── Draw ────────────────────────────────────────────
-    let draw (g: Gfx) (input: Input.InputState) (state: RulesState) (screenW: int) (screenH: int) =
+    let draw (g: Gfx) (texOpt: CardRenderer.CardTextures option) (input: Input.InputState) (state: RulesState) (screenW: int) (screenH: int) =
         let cx = float screenW / 2.0
 
         let drawCentered (text: string) (y: int) (color: Color) =
@@ -178,18 +264,22 @@ module RulesScreen =
         // Separator line
         Gfx.fillRect g { X = 40; Y = 100; Width = screenW - 80; Height = 1 } Color.DarkGray
 
-        // Body text
-        let lines = pageLines state.CurrentPage
-        let lineH = 22
-        let startY = 115
-        for i in 0 .. lines.Length - 1 do
-            let line = lines[i]
-            let y = startY + i * lineH
-            let color =
-                if line.StartsWith("  ") then Color.LightGray
-                elif line = "" then Color.Transparent
-                else Color.White
-            Gfx.fillText g line 50.0 (float y) color
+        match pages.[state.CurrentPage] with
+        | TextPage(_, lines) ->
+            let lineH = 22
+            let startY = 115
+            for i in 0 .. lines.Length - 1 do
+                let line = lines[i]
+                let y = startY + i * lineH
+                let color =
+                    if line.StartsWith("  ") then Color.LightGray
+                    elif line = "" then Color.Transparent
+                    else Color.White
+                Gfx.fillText g line 50.0 (float y) color
+        | VisualPage(_, vid) ->
+            match texOpt with
+            | Some tex -> drawVisual g tex cx vid
+            | None -> drawCentered "Loading cards..." 300 Color.Gray
 
         // Navigation buttons
         Button.draw g input (backButton screenW screenH)
