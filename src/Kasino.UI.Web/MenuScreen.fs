@@ -100,7 +100,7 @@ module MenuScreen =
         | ShowOptions -> state
 
     /// Draw menu screen with tappable buttons.
-    let draw (g: Gfx) (input: Input.InputState) (state: MenuState) (screenW: int) (screenH: int) =
+    let draw (g: Gfx) (texOpt: CardRenderer.CardTextures option) (input: Input.InputState) (state: MenuState) (screenW: int) (screenH: int) =
         let cx = float (screenW / 2)
         let drawCentered (text: string) (y: int) (color: Color) =
             let size = Gfx.measure g text
@@ -108,6 +108,20 @@ module MenuScreen =
 
         drawCentered "KASINO" 40 Color.Gold
         drawCentered "Finnish Card Game" 80 Color.White
+
+        // Decorative fan of the four aces — held-in-hand shape — in the empty
+        // band between the selection buttons and the bottom Options button.
+        match texOpt with
+        | Some tex ->
+            // x,y is the card centre (drawImageRotated rotates about it).
+            let drawAce (card: Card) (x: float) (y: float) (w: int) (h: int) (rot: float) =
+                Gfx.drawImageRotated g (CardRenderer.getTexture tex card) x y w h rot
+            let fanY = float ((336 + (screenH - 142)) / 2)       // midpoint of the empty band
+            let acesFan = [ Spades, -0.30; Hearts, -0.10; Diamonds, 0.10; Clubs, 0.30 ]
+            for i, (suit, rot) in List.indexed acesFan do
+                let off = float i - 1.5                          // -1.5, -0.5, 0.5, 1.5
+                drawAce { Suit = suit; Rank = Ace } (cx + off * 54.0) (fanY + abs off * 9.0) 60 76 rot
+        | None -> ()
 
         match state.Step with
         | VariantSelect ->

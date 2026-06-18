@@ -49,6 +49,7 @@ module GameScreen =
     type DragState =
         | NotDragging
         | Dragging of cardIndex: int * startPos: Point * currentPos: Point
+        | DraggingTable of card: Card * grabOffsetX: int * grabOffsetY: int   // nudging a table card (scatter mode)
 
     type TableLayout =
         | StrictGrid
@@ -184,6 +185,27 @@ module GameScreen =
             result <- result |> Map.add card (bestX, bestY, bestRot)
 
         result
+
+    /// Topmost scattered table card whose rect contains `pos` (for drag-to-reposition).
+    let private tableCardAtScatter (screen: ScreenState) (pos: Point) =
+        let cw = CardRenderer.scaledWidth ()
+        let ch = CardRenderer.scaledHeight ()
+        screen.GameState.Table
+        |> List.rev                                   // later in the list draws on top
+        |> List.tryPick (fun card ->
+            match Map.tryFind card screen.ScatteredPositions with
+            | Some(sx, sy, _) ->
+                if ({ X = sx - cw / 2; Y = sy - ch / 2; Width = cw; Height = ch }: Rect).Contains pos then Some card else None
+            | None -> None)
+
+    /// Clamp a scattered card's centre so the whole card stays within the table area.
+    let private clampScatterCenter (screenW: int) (screenH: int) (cx: int) (cy: int) =
+        let area = tableArea screenW screenH
+        let cw = CardRenderer.scaledWidth ()
+        let ch = CardRenderer.scaledHeight ()
+        let x = max (area.X + cw / 2) (min (area.X + area.Width - cw / 2) cx)
+        let y = max (area.Y + ch / 2) (min (area.Y + area.Height - ch / 2) cy)
+        (x, y)
 
     /// Build deal animation steps. First deal: 4 to table, then 2/player x2.
     let private buildDealSteps (gs: GameEngine.GameState) (isFirstDeal: bool) (screenW: int) (screenH: int) =
@@ -459,7 +481,7 @@ module GameScreen =
 
             let hovered =
                 match screen.DragState with
-                | Dragging _ -> None
+                | Dragging _ | DraggingTable _ -> None
                 | NotDragging ->
                     rects
                     |> List.tryFind (fun (_, r) -> Input.hitTest r input.Mouse.Position)
@@ -468,7 +490,7 @@ module GameScreen =
             let previewIdx =
                 match screen.DragState with
                 | Dragging(idx, _, _) -> Some idx
-                | NotDragging -> screen.SelectedCardIndex
+                | NotDragging | DraggingTable _ -> screen.SelectedCardIndex
             let preview =
                 match previewIdx with
                 | Some idx when idx < player.Hand.Length ->
@@ -516,16 +538,37 @@ module GameScreen =
                             SelectedCardIndex = Some idx
                             DragState = Dragging(idx, input.Mouse.Position, input.Mouse.Position) }
                     | None ->
-                        match screen.SelectedCardIndex with
-                        | Some selectedIdx ->
-                            let btn = playButton screenW screenH preview
-                            if Button.isClicked input btn then
-                                processHumanPlay screen selectedIdx screenW screenH
-                            else
-                                { screen with SelectedCardIndex = None; CapturePreview = NoCapture }
-                        | None -> screen
+                        // Tapped outside the hand. Priority: Play button, then nudge a
+                        // table card (scatter mode only — the grid never overlaps), else deselect.
+                        let btn = playButton screenW screenH preview
+                        if screen.SelectedCardIndex.IsSome && Button.isClicked input btn then
+                            processHumanPlay screen screen.SelectedCardIndex.Value screenW screenH
+                        else
+                            let tableCardOpt =
+                                if screen.TableLayout = RandomScatter
+                                then tableCardAtScatter screen input.Mouse.Position
+                                else None
+                            match tableCardOpt with
+                            | Some card ->
+                                match Map.tryFind card screen.ScatteredPositions with
+                                | Some(sx, sy, _) ->
+                                    { screen with DragState = DraggingTable(card, input.Mouse.Position.X - sx, input.Mouse.Position.Y - sy) }
+                                | None -> screen
+                            | None ->
+                                match screen.SelectedCardIndex with
+                                | Some _ -> { screen with SelectedCardIndex = None; CapturePreview = NoCapture }
+                                | None -> screen
                 else
                     screen
+
+            | DraggingTable(card, gdx, gdy) ->
+                if input.Mouse.LeftPressed then
+                    // reposition the card under the cursor, kept inside the table area
+                    let (cx, cy) = clampScatterCenter screenW screenH (input.Mouse.Position.X - gdx) (input.Mouse.Position.Y - gdy)
+                    let rot = match Map.tryFind card screen.ScatteredPositions with Some(_, _, r) -> r | None -> 0.0
+                    { screen with ScatteredPositions = Map.add card (cx, cy, rot) screen.ScatteredPositions }
+                else
+                    { screen with DragState = NotDragging }
 
             | Dragging(idx, startPos, _) ->
                 if input.Mouse.LeftPressed then
@@ -777,6 +820,7 @@ module GameScreen =
             | WaitingForHuman when screen.SelectedCardIndex.IsSome ->
                 match screen.DragState with
                 | Dragging _ -> "Drag to table or release to cancel"
+                | DraggingTable _ -> "Repositioning card…"
                 | NotDragging ->
                     match screen.CapturePreview with
                     | NoCapture -> "Place on table. [Enter] play  [Esc] cancel"

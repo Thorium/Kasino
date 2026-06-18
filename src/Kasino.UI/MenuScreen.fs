@@ -107,7 +107,7 @@ module MenuScreen =
         | ShowOptions -> state
 
     /// Draw menu screen with tappable buttons
-    let draw (sb: SpriteBatch) (font: SpriteFontBase) (input: InputHandler.InputState) (state: MenuState) (screenW: int) (screenH: int) =
+    let draw (sb: SpriteBatch) (font: SpriteFontBase) (texOpt: CardRenderer.CardTextures option) (input: InputHandler.InputState) (state: MenuState) (screenW: int) (screenH: int) =
         let cx = screenW / 2
         let drawCentered (text: string) (y: int) (color: Color) =
             let size = font.MeasureString(text)
@@ -115,6 +115,22 @@ module MenuScreen =
 
         drawCentered "KASINO" 40 Color.Gold
         drawCentered "Finnish Card Game" 80 Color.White
+
+        // Decorative fan of the four aces — held-in-hand shape — in the empty
+        // band between the selection buttons and the bottom Options button.
+        match texOpt with
+        | Some tex ->
+            // x,y is the card centre (origin = texture centre).
+            let drawAce (card: Card) (x: float32) (y: float32) (w: int) (h: int) (rot: float32) =
+                let t = CardRenderer.getTexture tex card
+                let origin = Vector2(float32 t.Width / 2.0f, float32 t.Height / 2.0f)
+                sb.Draw(t, Rectangle(int x, int y, w, h), System.Nullable(), Color.White, rot, origin, SpriteEffects.None, 0.0f)
+            let fanY = float32 ((336 + (screenH - 142)) / 2)     // midpoint of the empty band
+            let acesFan = [ Spades, -0.30f; Hearts, -0.10f; Diamonds, 0.10f; Clubs, 0.30f ]
+            for i, (suit, rot) in List.indexed acesFan do
+                let off = float32 i - 1.5f                       // -1.5, -0.5, 0.5, 1.5
+                drawAce { Suit = suit; Rank = Ace } (float32 cx + off * 54.0f) (fanY + abs off * 9.0f) 60 76 rot
+        | None -> ()
 
         match state.Step with
         | VariantSelect ->

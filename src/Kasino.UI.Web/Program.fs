@@ -143,7 +143,7 @@ let private updateScreen (input: Input.InputState) (dt: float) =
 let private drawAll (g: Gfx) (input: Input.InputState) =
     Gfx.clear g screenW screenH (Color.rgb 25 50 35)
     match screen, textures with
-    | Menu m, _ -> MenuScreen.draw g input m screenW screenH
+    | Menu m, tex -> MenuScreen.draw g tex input m screenW screenH
     | Playing p, Some tex -> GameScreen.draw g input tex p screenW screenH
     | Scores s, _ -> ScoreScreen.draw g input s screenW screenH
     | Rules(r, _), tex -> RulesScreen.draw g tex input r screenW screenH

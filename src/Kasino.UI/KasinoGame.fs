@@ -316,8 +316,8 @@ type KasinoGame() as this =
         spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp)
 
         match screen, textures with
-        | Menu menuState, _ ->
-            MenuScreen.draw spriteBatch font lastInput menuState (screenW()) (screenH())
+        | Menu menuState, texOpt ->
+            MenuScreen.draw spriteBatch font texOpt lastInput menuState (screenW()) (screenH())
         | Playing gameState, Some tex ->
             GameScreen.draw spriteBatch font lastInput tex gameState (screenW()) (screenH())
         | Scores scoreState, _ ->
