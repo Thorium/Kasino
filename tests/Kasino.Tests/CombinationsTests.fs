@@ -74,3 +74,45 @@ let ``findCaptureCombinations should handle Ace with value 14`` () =
     Assert.True(combos.Length >= 1)
     let combo = combos |> List.find (fun c -> c.Length = 2)
     Assert.Equal(2, combo.Length)
+
+// ─────────────────────────────────────────────────────────────
+// Ported from the original KasinoLibrary tests (KasinoLogicsTest.cs:
+// "SaakoTesti" / "YksKakstesti"). These pin down the subset-sum
+// existence and exact-result behaviour the original game relied on,
+// expressed against the current findExactSubsets solver.
+// ─────────────────────────────────────────────────────────────
+
+/// Original `Saako k p`: does some non-empty subset of p sum to exactly k?
+let private saako (target: int) (values: int list) =
+    values
+    |> List.mapi (fun i v -> (i, v))
+    |> fun items -> Combinations.findExactSubsets items target
+    |> List.isEmpty
+    |> not
+
+[<Fact>]
+let ``Saako: subset-sum existence matches original behaviour`` () =
+    // Six 1s can only ever reach 6, so 7 is unreachable...
+    Assert.False(saako 7 [ 1; 1; 1; 1; 1; 1 ])
+    // ...but swapping any one for a 2 makes 7 reachable (5x1 + 2).
+    Assert.True(saako 7 [ 1; 1; 1; 1; 1; 2 ])
+    Assert.True(saako 7 [ 1; 1; 1; 2; 1; 2 ])
+    Assert.True(saako 7 [ 2; 1; 1; 1; 1; 1 ])
+
+    // From {1,2,3,4,12,13}: 4 (=4 or 1+3) and 5 (=1+4 or 2+3) are reachable;
+    // 11 is a gap (1+2+3+4 = 10, next jump is 12); 15 = 2+13 = 3+12.
+    Assert.True(saako 4 [ 1; 2; 3; 4; 12; 13 ])
+    Assert.True(saako 5 [ 1; 2; 3; 4; 12; 13 ])
+    Assert.False(saako 11 [ 1; 2; 3; 4; 12; 13 ])
+    Assert.True(saako 15 [ 1; 2; 3; 4; 12; 13 ])
+
+[<Fact>]
+let ``findExactSubsets returns exact picks over a [1;2] table (ported YksKaks)`` () =
+    // Table holds an Ace (value 1) at index 0 and a Two (value 2) at index 1.
+    let table = [ (0, 1); (1, 2) ]
+    // Target 1 -> just the Ace.
+    Assert.Equal<int list list>([ [ 0 ] ], Combinations.findExactSubsets table 1)
+    // Target 2 -> just the Two.
+    Assert.Equal<int list list>([ [ 1 ] ], Combinations.findExactSubsets table 2)
+    // Target 3 -> both cards together (1 + 2).
+    Assert.Equal<int list list>([ [ 0; 1 ] ], Combinations.findExactSubsets table 3)
