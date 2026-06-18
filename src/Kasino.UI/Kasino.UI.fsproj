@@ -11,6 +11,7 @@
     <Compile Include="InputHandler.fs" />
     <Compile Include="Button.fs" />
     <Compile Include="RulesScreen.fs" />
+    <Compile Include="OptionsScreen.fs" />
     <Compile Include="MenuScreen.fs" />
     <Compile Include="GameScreen.fs" />
     <Compile Include="ScoreScreen.fs" />

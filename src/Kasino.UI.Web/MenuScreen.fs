@@ -15,6 +15,7 @@ module MenuScreen =
         | HumanCountSelect
         | Ready
         | ShowRules
+        | ShowOptions
 
     type MenuState =
         { Step: MenuChoice
@@ -50,11 +51,18 @@ module MenuScreen =
     let private howToPlayButton (screenW: int) (screenH: int) =
         Button.createCentered "How to Play" screenW (screenH - 80) 220 52 (Color.rgb 80 80 40) Color.White
 
+    /// "Options" button — visible on all menu steps, just above "How to Play".
+    let private optionsButton (screenW: int) (screenH: int) =
+        Button.createCentered "Options" screenW (screenH - 142) 220 52 (Color.rgb 60 60 100) Color.White
+
     /// Advance menu based on input (touch buttons + keyboard fallback).
     let update (input: Input.InputState) (screenW: int) (screenH: int) (state: MenuState) =
         let helpBtn = howToPlayButton screenW screenH
+        let optBtn = optionsButton screenW screenH
         if Button.isClicked input helpBtn then
             { state with Step = ShowRules }
+        elif Button.isClicked input optBtn then
+            { state with Step = ShowOptions }
         else
         match state.Step with
         | VariantSelect ->
@@ -89,6 +97,7 @@ module MenuScreen =
                 | _ -> state
         | Ready -> state
         | ShowRules -> state
+        | ShowOptions -> state
 
     /// Draw menu screen with tappable buttons.
     let draw (g: Gfx) (input: Input.InputState) (state: MenuState) (screenW: int) (screenH: int) =
@@ -115,8 +124,10 @@ module MenuScreen =
             drawCentered "How many human players?" 180 Color.LightGray
             Button.drawAll g input (humanCountButtons screenW)
         | Ready -> ()
-        | ShowRules -> ()
+        | ShowRules | ShowOptions -> ()
 
         match state.Step with
-        | Ready | ShowRules -> ()
-        | _ -> Button.draw g input (howToPlayButton screenW screenH)
+        | Ready | ShowRules | ShowOptions -> ()
+        | _ ->
+            Button.draw g input (optionsButton screenW screenH)
+            Button.draw g input (howToPlayButton screenW screenH)

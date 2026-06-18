@@ -18,6 +18,7 @@ module MenuScreen =
         | HumanCountSelect
         | Ready
         | ShowRules
+        | ShowOptions
 
     type MenuState =
         { Step: MenuChoice
@@ -54,12 +55,19 @@ module MenuScreen =
     let private howToPlayButton (screenW: int) (screenH: int) =
         Button.createCentered "How to Play" screenW (screenH - 80) 220 52 (Color(80, 80, 40)) Color.White
 
+    /// "Options" button — visible on all menu steps, just above "How to Play"
+    let private optionsButton (screenW: int) (screenH: int) =
+        Button.createCentered "Options" screenW (screenH - 142) 220 52 (Color(60, 60, 100)) Color.White
+
     /// Advance menu based on input (touch buttons + keyboard fallback)
     let update (input: InputHandler.InputState) (screenW: int) (screenH: int) (state: MenuState) =
-        // Check "How to Play" button first — available on all steps
+        // Check "How to Play" / "Options" buttons first — available on all steps
         let helpBtn = howToPlayButton screenW screenH
+        let optBtn = optionsButton screenW screenH
         if Button.isClicked input helpBtn then
             { state with Step = ShowRules }
+        elif Button.isClicked input optBtn then
+            { state with Step = ShowOptions }
         else
         match state.Step with
         | VariantSelect ->
@@ -96,6 +104,7 @@ module MenuScreen =
                 | _ -> state
         | Ready -> state
         | ShowRules -> state
+        | ShowOptions -> state
 
     /// Draw menu screen with tappable buttons
     let draw (sb: SpriteBatch) (font: SpriteFontBase) (input: InputHandler.InputState) (state: MenuState) (screenW: int) (screenH: int) =
@@ -127,10 +136,12 @@ module MenuScreen =
         | Ready ->
             ()
 
-        | ShowRules ->
-            ()   // handled by KasinoGame — should not draw menu in this state
+        | ShowRules | ShowOptions ->
+            ()   // handled by KasinoGame — should not draw menu in these states
 
-        // "How to Play" button visible on all non-transitional steps
+        // "Options" / "How to Play" buttons visible on all non-transitional steps
         match state.Step with
-        | Ready | ShowRules -> ()
-        | _ -> Button.draw sb font input (howToPlayButton screenW screenH)
+        | Ready | ShowRules | ShowOptions -> ()
+        | _ ->
+            Button.draw sb font input (optionsButton screenW screenH)
+            Button.draw sb font input (howToPlayButton screenW screenH)

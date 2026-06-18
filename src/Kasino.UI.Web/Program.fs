@@ -17,6 +17,7 @@ type ActiveScreen =
     | Playing of GameScreen.ScreenState
     | Scores of ScoreScreen.ScoreState
     | Rules of RulesScreen.RulesState * ActiveScreen
+    | Options of OptionsScreen.OptionsState * ActiveScreen
 
 // Logical drawing space. The height is fixed so card/font sizes stay
 // constant; the width tracks the viewport's aspect ratio (set in `resize`)
@@ -27,9 +28,16 @@ let mutable screenW = 1024
 let mutable screenH = 768
 
 let mutable private screen: ActiveScreen = Menu MenuScreen.initial
+let mutable private settings = Settings.defaultSettings
 let mutable private rng = Random()
 let mutable private textures: CardRenderer.CardTextures option = None
 let mutable private lastTime = 0.0
+
+/// Choose the card back for a new game: random scenic back if enabled,
+/// otherwise a single fixed back so it stays constant.
+let private applyCardBack (config: GameEngine.GameConfig) (tex: CardRenderer.CardTextures) =
+    if config.Settings.RandomCardBacks then CardRenderer.pickRandomBack rng tex
+    elif tex.Backs.Length > 0 then tex.Back <- tex.Backs[0]
 
 let private updateScreen (input: Input.InputState) (dt: float) =
     match screen with
@@ -42,12 +50,25 @@ let private updateScreen (input: Input.InputState) (dt: float) =
                   PlayerCount = newMenu.PlayerCount
                   HumanCount = newMenu.HumanCount
                   Seed = None
-                  TargetScore = 16 }
+                  TargetScore = 16
+                  Settings = settings }
             rng <- Random()
             let players = GameEngine.createPlayers config
             let scores = players |> List.map (fun p -> p.Name, 0) |> Map.ofList
             let gameScreen = GameScreen.create config rng players 1 scores
+            textures |> Option.iter (applyCardBack config)
             screen <- Playing gameScreen
+        | MenuScreen.ShowOptions ->
+            // Return to a real menu step, not the transitional ShowOptions
+            // (which would instantly re-open Options and trap the Back button).
+            let prevStep =
+                match menuState.Step with
+                | MenuScreen.VariantSelect -> MenuScreen.VariantSelect
+                | MenuScreen.PlayerCountSelect -> MenuScreen.PlayerCountSelect
+                | MenuScreen.HumanCountSelect -> MenuScreen.HumanCountSelect
+                | _ -> MenuScreen.VariantSelect
+            let returnMenu = { newMenu with Step = prevStep }
+            screen <- Options(OptionsScreen.create settings, Menu returnMenu)
         | MenuScreen.ShowRules ->
             let prevStep =
                 match menuState.Step with
@@ -95,10 +116,13 @@ let private updateScreen (input: Input.InputState) (dt: float) =
                       PlayerCount = newScoreState.Scores.Length
                       HumanCount = humanCount
                       Seed = None
-                      TargetScore = newScoreState.TargetScore }
+                      TargetScore = newScoreState.TargetScore
+                      Settings = settings }
                 let players = newScoreState.Scores |> List.map fst
                 let nextRound = newScoreState.RoundNumber + 1
                 let gameScreen = GameScreen.create config rng players nextRound newScoreState.CumulativeScores
+                // Keep the same card back for every round of this game; the
+                // back is randomized only when a new game starts (from menu).
                 screen <- Playing gameScreen
         else
             screen <- Scores newScoreState
@@ -108,6 +132,14 @@ let private updateScreen (input: Input.InputState) (dt: float) =
         if newRules.BackClicked then screen <- returnTo
         else screen <- Rules(newRules, returnTo)
 
+    | Options(optionsState, returnTo) ->
+        let newOptions = OptionsScreen.update input screenW screenH optionsState
+        if newOptions.BackClicked then
+            settings <- newOptions.Settings
+            screen <- returnTo
+        else
+            screen <- Options(newOptions, returnTo)
+
 let private drawAll (g: Gfx) (input: Input.InputState) =
     Gfx.clear g screenW screenH (Color.rgb 25 50 35)
     match screen, textures with
@@ -115,6 +147,7 @@ let private drawAll (g: Gfx) (input: Input.InputState) =
     | Playing p, Some tex -> GameScreen.draw g input tex p screenW screenH
     | Scores s, _ -> ScoreScreen.draw g input s screenW screenH
     | Rules(r, _), _ -> RulesScreen.draw g input r screenW screenH
+    | Options(o, _), _ -> OptionsScreen.draw g input o screenW screenH
     | Playing _, None -> Gfx.fillText g "Loading..." 40.0 40.0 Color.White
 
 // ── Bootstrap ───────────────────────────────────────────────

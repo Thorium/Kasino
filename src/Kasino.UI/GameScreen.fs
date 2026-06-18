@@ -91,7 +91,8 @@ module GameScreen =
           MenuClicked: bool                    // signal to return to main menu
           DragState: DragState                 // drag & drop state
           TableLayout: TableLayout             // strict grid or random scatter
-          ScatteredPositions: Map<Card, (int * int * float32)> }  // card -> (x, y, rotation)
+          ScatteredPositions: Map<Card, (int * int * float32)>   // card -> (x, y, rotation)
+          Chat: (string * float) option }      // active table-talk line + seconds remaining
 
     let private computerDelay = 0.8
     let private animDelay = 1.4        // slightly longer to fit collect animation
@@ -350,8 +351,9 @@ module GameScreen =
           ShowRulesClicked = false
           MenuClicked = false
           DragState = NotDragging
-          TableLayout = RandomScatter
-          ScatteredPositions = Map.empty }
+          TableLayout = (if config.Settings.DefaultScatter then RandomScatter else StrictGrid)
+          ScatteredPositions = Map.empty
+          Chat = None }
 
     // ── Update logic ────────────────────────────────────────
 
@@ -464,6 +466,14 @@ module GameScreen =
         let gs = screen.GameState
 
         // Update scattered positions when table changes
+        // Fade out any active table-talk line.
+        let screen =
+            match screen.Chat with
+            | Some(text, t) ->
+                let t2 = t - dt
+                { screen with Chat = (if t2 <= 0.0 then None else Some(text, t2)) }
+            | None -> screen
+
         let screen =
             match screen.TableLayout with
             | RandomScatter ->
@@ -628,7 +638,8 @@ module GameScreen =
             let newElapsed = elapsed + dt
             if newElapsed >= computerDelay then
                 let player = gs.Players[gs.CurrentPlayerIndex]
-                let turnResult = GameEngine.playComputerTurn gs
+                let style = GameEngine.computerStyle screen.Config gs.CurrentPlayerIndex
+                let turnResult = GameEngine.playComputerTurnStyled style gs
                 let collectAnim =
                     buildCollectAnimation turnResult.PlayResult false screenW screenH
                         screen.ScatteredPositions gs.Table (List.length gs.Table)
@@ -660,10 +671,23 @@ module GameScreen =
                                Duration = cardSlideDuration }
                     else None
                 let msg = formatPlayResult player.Name turnResult.PlayResult
+                let newChat =
+                    if screen.Config.Settings.ChatEnabled then
+                        let mood =
+                            if screen.Rng.Next 3 = 0 then Chat.Idle
+                            else
+                                match turnResult.PlayResult with
+                                | Capture(_, _, true) -> Chat.Sweep
+                                | Capture _ -> Chat.Capture
+                                | Place _ -> Chat.Place
+                        let seed = gs.DealRound * 7 + gs.CurrentPlayerIndex * 3 + List.length player.Hand
+                        Some($"{player.Name}: {Chat.pick seed mood}", 3.5)
+                    else None
                 { screen with
                     GameState = turnResult.NewState
                     LastPlayMessage = msg
                     ScatteredPositions = newScattered
+                    Chat = newChat
                     Phase = AnimatingPlay(0.0, turnResult.Evaluation, cardAnim, collectAnim) }
             else
                 { screen with Phase = ComputerThinking newElapsed }
@@ -880,6 +904,20 @@ module GameScreen =
             | RoundOver -> "Round over! [Enter] continue"
             | GameOver -> "Game over!"
         sb.DrawString(font, turnText, Vector2(20.0f, float32 (statusY + 20)), Color.Gold) |> ignore
+
+        // ── Table-talk bubble (optional AI chat) ────────
+        match screen.Chat with
+        | Some(text, _) ->
+            let size = font.MeasureString(text)
+            let pad = 10
+            let bw = int size.X + pad * 2
+            let bh = int size.Y + pad
+            let bx = (screenW - bw) / 2
+            let by = statusY - bh - 12
+            let bgTex = CardRenderer.getCachedColorTexture (sb.GraphicsDevice) (Color(20, 20, 30, 220))
+            sb.Draw(bgTex, Rectangle(bx, by, bw, bh), Color.White)
+            sb.DrawString(font, text, Vector2(float32 (bx + pad), float32 (by + pad / 2)), Color.LightYellow) |> ignore
+        | None -> ()
 
         // ── Draw scoreboard (top-right, below opponent label) ──
         let scoreX = screenW - 200

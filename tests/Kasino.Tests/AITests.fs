@@ -115,3 +115,31 @@ let ``Standard AI should pick highest-point capture when overlapping`` () =
         // Should contain Diamond Ten
         Assert.True(opt.Captured |> List.exists Cards.isDiamondTen)
     | None -> Assert.Fail("Expected a capture option")
+
+// ── Personality play styles (chooseBestStyled) ───────────────
+
+[<Fact>]
+let ``chooseBestStyled Balanced matches chooseBest for Standard`` () =
+    let table = [ { Suit = Hearts; Rank = Three }; { Suit = Hearts; Rank = Four }; { Suit = Diamonds; Rank = Ten } ]
+    let hand = [ { Suit = Clubs; Rank = Seven }; { Suit = Hearts; Rank = Ten } ]
+    let balanced = AI.chooseBestStyled AI.Balanced StandardKasino defaultCtx hand table
+    let baseline = AI.chooseBest StandardKasino defaultCtx hand table
+    Assert.Equal(baseline.HandCard, balanced.HandCard)
+
+[<Fact>]
+let ``Aggressive grabs more cards while Cautious secures points`` () =
+    // 7 captures {3,4} (2 cards, no points); 10 captures the 10 of diamonds (1 card, 2 points).
+    let table = [ { Suit = Hearts; Rank = Three }; { Suit = Hearts; Rank = Four }; { Suit = Diamonds; Rank = Ten } ]
+    let hand = [ { Suit = Clubs; Rank = Seven }; { Suit = Hearts; Rank = Ten } ]
+    let aggressive = AI.chooseBestStyled AI.Aggressive StandardKasino defaultCtx hand table
+    let cautious = AI.chooseBestStyled AI.Cautious StandardKasino defaultCtx hand table
+    Assert.Equal(Seven, aggressive.HandCard.Rank)
+    Assert.Equal(Ten, cautious.HandCard.Rank)
+
+[<Fact>]
+let ``every style still captures when a capture is available`` () =
+    let table = [ { Suit = Spades; Rank = Five } ]
+    let hand = [ { Suit = Hearts; Rank = Five }; { Suit = Hearts; Rank = King } ]
+    for style in [ AI.Balanced; AI.Aggressive; AI.Cautious ] do
+        let eval = AI.chooseBestStyled style StandardKasino defaultCtx hand table
+        Assert.True(eval.CardsCaptured > 0, $"style {style} should capture")

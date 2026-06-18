@@ -13,7 +13,8 @@ let private makeConfig variant playerCount humanCount =
       GameEngine.PlayerCount = playerCount
       GameEngine.HumanCount = humanCount
       GameEngine.Seed = Some 42
-      GameEngine.TargetScore = 16 }
+      GameEngine.TargetScore = 16
+      GameEngine.Settings = Settings.defaultSettings }
 
 [<Fact>]
 let ``totalDealRounds should return 6 for 2 players`` () =
@@ -39,7 +40,7 @@ let ``createPlayers should set first player as Human when HumanCount > 0`` () =
     let config = makeConfig StandardKasino 2 1
     let players = GameEngine.createPlayers config
     Assert.Equal(Human, players[0].Type)
-    Assert.Equal("Pelaaja", players[0].Name)
+    Assert.Equal("Player", players[0].Name)
     Assert.Equal(Computer, players[1].Type)
 
 [<Fact>]
@@ -154,3 +155,22 @@ let ``newRound should create fresh state`` () =
     Assert.True(state.Players |> List.forall (fun p -> List.isEmpty p.Hand))
     Assert.True(state.Players |> List.forall (fun p -> List.isEmpty p.CapturedCards))
     Assert.True(state.Players |> List.forall (fun p -> p.Sweeps = 0))
+
+[<Fact>]
+let ``createPlayers uses personality names when AiPersonalities is on`` () =
+    let config = { makeConfig StandardKasino 2 0 with Settings = { Settings.defaultSettings with AiPersonalities = true } }
+    let players = GameEngine.createPlayers config
+    Assert.Equal(Personality.forCpu(0).Name, players[0].Name)
+    Assert.Equal(Personality.forCpu(1).Name, players[1].Name)
+
+[<Fact>]
+let ``createPlayers uses plain CPU name when AiPersonalities is off`` () =
+    let config = makeConfig StandardKasino 2 1
+    let players = GameEngine.createPlayers config
+    Assert.Equal("CPU", players[1].Name)
+
+[<Fact>]
+let ``computerStyle honours personalities for CPU seats`` () =
+    let config = { makeConfig StandardKasino 2 1 with Settings = { Settings.defaultSettings with AiPersonalities = true } }
+    Assert.Equal(AI.Balanced, GameEngine.computerStyle config 0)
+    Assert.Equal((Personality.forCpu 0).Style, GameEngine.computerStyle config 1)

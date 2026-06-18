@@ -46,7 +46,8 @@ module CardRenderer =
 
     type CardTextures =
         { Cards: Dictionary<string, HTMLImageElement>
-          Back: HTMLImageElement
+          mutable Back: HTMLImageElement  // currently active card back (one of Backs)
+          Backs: HTMLImageElement[]       // available card-back designs (scenic photos)
           TableBg: HTMLImageElement }
 
     /// Vite's configured base URL (always ends in "/").
@@ -60,11 +61,16 @@ module CardRenderer =
     /// Load every card image and invoke `onReady` once all have settled
     /// (each image resolves via either onload or onerror so we never hang).
     let loadAll (onReady: CardTextures -> unit) =
+        // Scenic card backs carried over from the original 2002 deck; one is
+        // chosen at random per game (see pickRandomBack). back.png is the
+        // procedural fallback used only if none of these load.
+        let backFiles = [ "back1.png"; "back2.png"; "back3.png" ]
         let files =
             [ for suit in Cards.allSuits do
                 for rank in Cards.allRanks do
                     yield cardFilename { Suit = suit; Rank = rank } ]
             @ [ "back.png"; "table_bg.png" ]
+            @ backFiles
 
         let mutable remaining = files.Length
         let images = Dictionary<string, HTMLImageElement>()
@@ -79,9 +85,20 @@ module CardRenderer =
                         match images.TryGetValue f with
                         | true, img -> cards[f] <- img
                         | _ -> ()
+                let loadedBacks =
+                    backFiles
+                    |> List.choose (fun f ->
+                        match images.TryGetValue f with
+                        | true, img when img.naturalWidth > 0 -> Some img
+                        | _ -> None)
+                let backs =
+                    match loadedBacks with
+                    | [] -> [| images["back.png"] |]
+                    | xs -> List.toArray xs
                 onReady
                     { Cards = cards
-                      Back = images["back.png"]
+                      Back = backs[0]
+                      Backs = backs
                       TableBg = images["table_bg.png"] }
 
         for file in files do
@@ -89,6 +106,11 @@ module CardRenderer =
             images[file] <- img
             img.onload <- fun _ -> settle ()
             img.onerror <- fun _ -> settle ()
+
+    /// Pick a random card back for the next game/round (mutates the active Back).
+    let pickRandomBack (rng: System.Random) (textures: CardTextures) =
+        if textures.Backs.Length > 0 then
+            textures.Back <- textures.Backs[rng.Next textures.Backs.Length]
 
     /// Image for a specific card (falls back to the card back if missing).
     let getTexture (textures: CardTextures) (card: Card) =

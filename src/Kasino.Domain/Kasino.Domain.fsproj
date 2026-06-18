@@ -10,6 +10,7 @@
     <Compile Include="Rules.fs" />
     <Compile Include="Scoring.fs" />
     <Compile Include="AI.fs" />
+    <Compile Include="Settings.fs" />
     <Compile Include="GameEngine.fs" />
   </ItemGroup>
 </Project>

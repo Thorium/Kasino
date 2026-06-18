@@ -58,7 +58,8 @@ type ActiveScreen =
     | Menu of MenuScreen.MenuState
     | Playing of GameScreen.ScreenState
     | Scores of ScoreScreen.ScoreState
-    | Rules of RulesScreen.RulesState * ActiveScreen   // rules overlay + screen to return to
+    | Rules of RulesScreen.RulesState * ActiveScreen        // rules overlay + screen to return to
+    | Options of OptionsScreen.OptionsState * ActiveScreen  // options overlay + screen to return to
 
 type KasinoGame() as this =
     inherit Game()
@@ -70,11 +71,18 @@ type KasinoGame() as this =
     let mutable fontSmall: SpriteFontBase = Unchecked.defaultof<_>
     let mutable textures: CardRenderer.CardTextures option = None
     let mutable screen: ActiveScreen = Menu MenuScreen.initial
+    let mutable settings = Settings.defaultSettings
     let mutable rng = Random()
     let mutable lastInput: InputHandler.InputState = InputHandler.defaultState
 
     let screenW () = graphics.PreferredBackBufferWidth
     let screenH () = graphics.PreferredBackBufferHeight
+
+    /// Choose the card back for a new game: random scenic back if enabled,
+    /// otherwise a single fixed back so it stays constant.
+    let applyCardBack (config: GameEngine.GameConfig) (tex: CardRenderer.CardTextures) =
+        if config.Settings.RandomCardBacks then CardRenderer.pickRandomBack rng tex
+        elif tex.Backs.Length > 0 then tex.Back <- tex.Backs[0]
 
     do
         graphics.PreferredBackBufferWidth <- 1024
@@ -167,6 +175,11 @@ type KasinoGame() as this =
         lastInput <- input
         let dt = gameTime.ElapsedGameTime.TotalSeconds
 
+        // Remember the screen at the start of the frame: Escape should only quit
+        // when we were already on the menu, not when this very frame's Escape
+        // closed an overlay (Options/Rules) and returned us to the menu.
+        let screenAtFrameStart = screen
+
         match screen with
         | Menu menuState ->
             let newMenu = MenuScreen.update input (screenW()) (screenH()) menuState
@@ -178,12 +191,25 @@ type KasinoGame() as this =
                       PlayerCount = newMenu.PlayerCount
                       HumanCount = newMenu.HumanCount
                       Seed = None
-                      TargetScore = 16 }
+                      TargetScore = 16
+                      Settings = settings }
                 rng <- Random()
                 let players = GameEngine.createPlayers config
                 let scores = players |> List.map (fun p -> p.Name, 0) |> Map.ofList
                 let gameScreen = GameScreen.create config rng players 1 scores
+                textures |> Option.iter (applyCardBack config)
                 screen <- Playing gameScreen
+            | MenuScreen.ShowOptions ->
+                // Open options from menu; return to a real menu step (not the
+                // transitional ShowOptions, which would instantly re-open it).
+                let prevStep =
+                    match menuState.Step with
+                    | MenuScreen.VariantSelect -> MenuScreen.VariantSelect
+                    | MenuScreen.PlayerCountSelect -> MenuScreen.PlayerCountSelect
+                    | MenuScreen.HumanCountSelect -> MenuScreen.HumanCountSelect
+                    | _ -> MenuScreen.VariantSelect
+                let returnMenu = { newMenu with Step = prevStep }
+                screen <- Options (OptionsScreen.create settings, Menu returnMenu)
             | MenuScreen.ShowRules ->
                 // Open rules from menu; return to previous menu step
                 let prevStep =
@@ -241,10 +267,13 @@ type KasinoGame() as this =
                           PlayerCount = newScoreState.Scores.Length
                           HumanCount = humanCount
                           Seed = None
-                          TargetScore = newScoreState.TargetScore }
+                          TargetScore = newScoreState.TargetScore
+                          Settings = settings }
                     let players = newScoreState.Scores |> List.map fst
                     let nextRound = newScoreState.RoundNumber + 1
                     let gameScreen = GameScreen.create config rng players nextRound newScoreState.CumulativeScores
+                    // Keep the same card back for every round of this game; the
+                    // back is randomized only when a new game starts (from menu).
                     screen <- Playing gameScreen
             else
                 screen <- Scores newScoreState
@@ -256,9 +285,19 @@ type KasinoGame() as this =
             else
                 screen <- Rules (newRules, returnTo)
 
+        | Options (optionsState, returnTo) ->
+            let newOptions = OptionsScreen.update input (screenW()) (screenH()) optionsState
+            if newOptions.BackClicked then
+                settings <- newOptions.Settings
+                screen <- returnTo
+            else
+                screen <- Options (newOptions, returnTo)
+
         // Exit on Escape from menu (edge-detected, so a single Escape held
         // while returning to the menu from gameplay does not also exit).
-        match screen with
+        // Gate on the screen at frame start so an Escape that just closed an
+        // overlay back to the menu does not also quit the game.
+        match screenAtFrameStart with
         | Menu _ when input.Keyboard.IsEscapePressed ->
             this.Exit()
         | _ -> ()
@@ -285,6 +324,8 @@ type KasinoGame() as this =
             ScoreScreen.draw spriteBatch font lastInput scoreState (screenW()) (screenH())
         | Rules (rulesState, _), _ ->
             RulesScreen.draw spriteBatch font lastInput rulesState (screenW()) (screenH())
+        | Options (optionsState, _), _ ->
+            OptionsScreen.draw spriteBatch font lastInput optionsState (screenW()) (screenH())
         | _ -> ()
 
         spriteBatch.End()

@@ -72,7 +72,8 @@ module GameScreen =
           MenuClicked: bool
           DragState: DragState
           TableLayout: TableLayout
-          ScatteredPositions: Map<Card, (int * int * float)> }
+          ScatteredPositions: Map<Card, (int * int * float)>
+          Chat: (string * float) option }      // active table-talk line + seconds remaining
 
     let private computerDelay = 0.8
     let private animDelay = 1.4
@@ -298,8 +299,9 @@ module GameScreen =
           ShowRulesClicked = false
           MenuClicked = false
           DragState = NotDragging
-          TableLayout = RandomScatter
-          ScatteredPositions = Map.empty }
+          TableLayout = (if config.Settings.DefaultScatter then RandomScatter else StrictGrid)
+          ScatteredPositions = Map.empty
+          Chat = None }
 
     // ── Update logic ────────────────────────────────────────
     let rec private advanceTurn (screen: ScreenState) =
@@ -393,6 +395,14 @@ module GameScreen =
 
     let update (input: Input.InputState) (dt: float) (screenW: int) (screenH: int) (screen: ScreenState) =
         let gs = screen.GameState
+
+        // Fade out any active table-talk line.
+        let screen =
+            match screen.Chat with
+            | Some(text, t) ->
+                let t2 = t - dt
+                { screen with Chat = (if t2 <= 0.0 then None else Some(text, t2)) }
+            | None -> screen
 
         let screen =
             match screen.TableLayout with
@@ -537,7 +547,8 @@ module GameScreen =
             let newElapsed = elapsed + dt
             if newElapsed >= computerDelay then
                 let player = gs.Players[gs.CurrentPlayerIndex]
-                let turnResult = GameEngine.playComputerTurn gs
+                let style = GameEngine.computerStyle screen.Config gs.CurrentPlayerIndex
+                let turnResult = GameEngine.playComputerTurnStyled style gs
                 let collectAnim =
                     buildCollectAnimation turnResult.PlayResult false screenW screenH screen.ScatteredPositions gs.Table (List.length gs.Table)
                 let toX, toY, newScattered =
@@ -568,10 +579,23 @@ module GameScreen =
                               Duration = cardSlideDuration }
                     else None
                 let msg = formatPlayResult player.Name turnResult.PlayResult
+                let newChat =
+                    if screen.Config.Settings.ChatEnabled then
+                        let mood =
+                            if screen.Rng.Next 3 = 0 then Chat.Idle
+                            else
+                                match turnResult.PlayResult with
+                                | Capture(_, _, true) -> Chat.Sweep
+                                | Capture _ -> Chat.Capture
+                                | Place _ -> Chat.Place
+                        let seed = gs.DealRound * 7 + gs.CurrentPlayerIndex * 3 + List.length player.Hand
+                        Some(sprintf "%s: %s" player.Name (Chat.pick seed mood), 3.5)
+                    else None
                 { screen with
                     GameState = turnResult.NewState
                     LastPlayMessage = msg
                     ScatteredPositions = newScattered
+                    Chat = newChat
                     Phase = AnimatingPlay(0.0, turnResult.Evaluation, cardAnim, collectAnim) }
             else
                 { screen with Phase = ComputerThinking newElapsed }
@@ -767,6 +791,19 @@ module GameScreen =
             | RoundOver -> "Round over! [Enter] continue"
             | GameOver -> "Game over!"
         Gfx.fillText g turnText 20.0 (float (statusY + 20)) Color.Gold
+
+        // ── Table-talk bubble (optional AI chat) ────────
+        match screen.Chat with
+        | Some(text, _) ->
+            let size = Gfx.measure g text
+            let pad = 10
+            let bw = int size.X + pad * 2
+            let bh = int size.Y + pad
+            let bx = (screenW - bw) / 2
+            let by = statusY - bh - 12
+            Gfx.fillRect g { X = bx; Y = by; Width = bw; Height = bh } (Color.rgba 20 20 30 220)
+            Gfx.fillText g text (float (bx + pad)) (float (by + pad / 2)) Color.Yellow
+        | None -> ()
 
         // ── Scoreboard (top-right) ──
         let scoreX = screenW - 200

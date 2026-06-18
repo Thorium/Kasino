@@ -52,7 +52,8 @@ module CardRenderer =
     /// All card textures keyed by (Suit, Rank)
     type CardTextures =
         { Cards: Map<Suit * Rank, Texture2D>
-          Back: Texture2D
+          mutable Back: Texture2D  // currently active card back (one of Backs)
+          Backs: Texture2D[]       // available card-back designs (scenic photos)
           Highlight: Texture2D     // yellow highlight border
           TableBg: Texture2D }     // green felt
 
@@ -178,10 +179,24 @@ module CardRenderer =
                         yield ((suit, rank), loadTexture device path) ]
             |> Map.ofList
 
-        let backPath = Path.Combine(cardsDir, "back.png")
-        let back =
+        // Scenic card backs (back1.png, back2.png, …) carried over from the
+        // original 2002 deck. One is chosen at random per game; if none are
+        // present we fall back to back.png or the procedural pattern.
+        let scenicBacks =
+            [ 1 .. 9 ]
+            |> List.choose (fun i ->
+                let p = Path.Combine(cardsDir, sprintf "back%d.png" i)
+                if File.Exists(p) then Some(loadTexture device p) else None)
+
+        let defaultBack =
+            let backPath = Path.Combine(cardsDir, "back.png")
             if File.Exists(backPath) then loadTexture device backPath
             else generateCardBack device
+
+        let backs =
+            match scenicBacks with
+            | [] -> [| defaultBack |]
+            | xs -> List.toArray xs
 
         let tableBgPath = Path.Combine(cardsDir, "table_bg.png")
         let tableBg =
@@ -190,7 +205,12 @@ module CardRenderer =
 
         let highlight = createColorTexture device (Color(255, 255, 0, 128))
 
-        { Cards = cardMap; Back = back; Highlight = highlight; TableBg = tableBg }
+        { Cards = cardMap; Back = backs[0]; Backs = backs; Highlight = highlight; TableBg = tableBg }
+
+    /// Pick a random card back for the next game/round (mutates the active Back).
+    let pickRandomBack (rng: Random) (textures: CardTextures) =
+        if textures.Backs.Length > 0 then
+            textures.Back <- textures.Backs[rng.Next textures.Backs.Length]
 
     /// Get the texture for a specific card (fallback to back if missing)
     let getTexture (textures: CardTextures) (card: Card) =

@@ -15,7 +15,8 @@ module GameEngine =
           PlayerCount: int
           HumanCount: int
           Seed: int option
-          TargetScore: int }
+          TargetScore: int
+          Settings: Settings.GameSettings }
 
     /// Full game state
     type GameState =
@@ -47,13 +48,26 @@ module GameEngine =
 
     /// Create initial players.
     let createPlayers (config: GameConfig) =
+        let cpuCount = config.PlayerCount - config.HumanCount
         [ for i in 0 .. config.PlayerCount - 1 do
             if i < config.HumanCount then
-                { Name = "Pelaaja"; Type = Human; Hand = []; CapturedCards = []; Sweeps = 0 }
+                let humanName = if config.HumanCount > 1 then $"Player {i + 1}" else "Player"
+                { Name = humanName; Type = Human; Hand = []; CapturedCards = []; Sweeps = 0 }
             else
                 let cpuIdx = i - config.HumanCount
-                let cpuName = $"Tietokone-{cpuIdx + 1}"
+                let cpuName =
+                    if config.Settings.AiPersonalities then (Personality.forCpu cpuIdx).Name
+                    elif cpuCount > 1 then $"CPU {cpuIdx + 1}"
+                    else "CPU"
                 { Name = cpuName; Type = Computer; Hand = []; CapturedCards = []; Sweeps = 0 } ]
+
+    /// Play style for the computer player at the given seat, honouring the
+    /// AiPersonalities setting (plain CPUs always play Balanced).
+    let computerStyle (config: GameConfig) (playerIdx: int) : AI.PlayStyle =
+        if config.Settings.AiPersonalities && playerIdx >= config.HumanCount then
+            (Personality.forCpu (playerIdx - config.HumanCount)).Style
+        else
+            AI.Balanced
 
     /// Deal cards to all players and optionally to the table (first deal).
     let dealRound (state: GameState) (isFirstDeal: bool) =
@@ -108,12 +122,12 @@ module GameEngine =
           OpponentCards = opponentCards; OpponentSpades = opponentSpades
           CardsRemaining = cardsRemaining }
 
-    /// Execute a computer player's turn. Returns TurnResult.
-    let playComputerTurn (state: GameState) : TurnResult =
+    /// Execute a computer player's turn using the given personality style.
+    let playComputerTurnStyled (style: AI.PlayStyle) (state: GameState) : TurnResult =
         let idx = state.CurrentPlayerIndex
         let player = state.Players[idx]
         let ctx = buildContext state idx
-        let eval = AI.chooseBest state.Variant ctx player.Hand state.Table
+        let eval = AI.chooseBestStyled style state.Variant ctx player.Hand state.Table
         let cardIdx = player.Hand |> List.findIndex (fun c -> c = eval.HandCard)
         let remainingHand = player.Hand |> List.removeAt cardIdx
 
@@ -150,6 +164,10 @@ module GameEngine =
                 LastCapturer = lastCapturer }
           PlayResult = result
           Evaluation = eval }
+
+    /// Execute a computer player's turn with balanced (optimal) play.
+    let playComputerTurn (state: GameState) : TurnResult =
+        playComputerTurnStyled AI.Balanced state
 
     /// Execute a human player's chosen card. Returns TurnResult.
     let playHumanTurn (state: GameState) (cardIndex: int) (chosenOption: Rules.CaptureOption option) : TurnResult =

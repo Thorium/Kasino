@@ -43,6 +43,17 @@ The table layout can be toggled between **Strict Grid** and **Random Scatter** v
 
 Full rules are available in-game via the **How to Play** button.
 
+## Options
+
+The start menu has an **Options** button. All settings are optional and persist for the session:
+
+| Setting | Default | Effect |
+|---|---|---|
+| Random card backs | On | Pick a random scenic card back per game (vs. a fixed back) |
+| Table layout | Scatter | Start games in Random Scatter or Strict Grid |
+| AI table-talk (chat) | Off | Computer players make short remarks as they play |
+| AI personalities | Off | Named opponents (e.g. *Reno the Risk-taker*, *Cautious Cara*) with distinct play styles |
+
 ## Requirements
 
 - [.NET 10.0 SDK](https://dotnet.microsoft.com/download)
