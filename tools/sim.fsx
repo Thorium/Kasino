@@ -26,7 +26,7 @@ let settings = { Settings.defaultSettings with AiPersonalities = false }
 
 let mkConfig variant playerCount : GameEngine.GameConfig =
     { Variant = variant
-      PlayerCount = playerCount
+      Seats = GameEngine.SeatCount.ofIntOrDefault playerCount
       HumanCount = 0
       Seed = None
       TargetScore = 16
@@ -56,12 +56,12 @@ let playRound (config: GameEngine.GameConfig) (rng: Random) (players: Player lis
 /// Play a full game to TargetScore. Returns (cumulative per seat, rounds played).
 let playGame (config: GameEngine.GameConfig) (rng: Random) =
     let players = GameEngine.createPlayers config
-    let cum = Array.zeroCreate config.PlayerCount
+    let cum = Array.zeroCreate (GameEngine.SeatCount.count config.Seats)
     let mutable round = 1
     let mutable over = false
     while not over do
         let totals = playRound config rng players round
-        for i in 0 .. config.PlayerCount - 1 do
+        for i in 0 .. GameEngine.SeatCount.count config.Seats - 1 do
             cum.[i] <- cum.[i] + totals.[i]
         if Array.exists (fun s -> s >= config.TargetScore) cum then over <- true
         round <- round + 1

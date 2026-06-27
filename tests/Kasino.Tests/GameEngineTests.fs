@@ -10,23 +10,23 @@ open Kasino.Domain
 
 let private makeConfig variant playerCount humanCount =
     { GameEngine.Variant = variant
-      GameEngine.PlayerCount = playerCount
+      GameEngine.Seats = GameEngine.SeatCount.ofIntOrDefault playerCount
       GameEngine.HumanCount = humanCount
       GameEngine.Seed = Some 42
       GameEngine.TargetScore = 16
       GameEngine.Settings = Settings.defaultSettings }
 
 [<Fact>]
-let ``totalDealRounds should return 6 for 2 players`` () =
-    Assert.Equal(6, GameEngine.totalDealRounds 2)
+let ``dealRounds should return 6 for 2 players`` () =
+    Assert.Equal(6, GameEngine.SeatCount.dealRounds GameEngine.SeatCount.Two)
 
 [<Fact>]
-let ``totalDealRounds should return 4 for 3 players`` () =
-    Assert.Equal(4, GameEngine.totalDealRounds 3)
+let ``dealRounds should return 4 for 3 players`` () =
+    Assert.Equal(4, GameEngine.SeatCount.dealRounds GameEngine.SeatCount.Three)
 
 [<Fact>]
-let ``totalDealRounds should return 3 for 4 players`` () =
-    Assert.Equal(3, GameEngine.totalDealRounds 4)
+let ``dealRounds should return 3 for 4 players`` () =
+    Assert.Equal(3, GameEngine.SeatCount.dealRounds GameEngine.SeatCount.Four)
 
 [<Fact>]
 let ``createPlayers should create correct number of players`` () =

@@ -188,7 +188,7 @@ type KasinoGame() as this =
                 // Start the game
                 let config: GameEngine.GameConfig =
                     { Variant = newMenu.Variant
-                      PlayerCount = newMenu.PlayerCount
+                      Seats = GameEngine.SeatCount.ofIntOrDefault newMenu.PlayerCount
                       HumanCount = newMenu.HumanCount
                       Seed = None
                       TargetScore = 16
@@ -264,7 +264,7 @@ type KasinoGame() as this =
                         |> List.length
                     let config: GameEngine.GameConfig =
                         { Variant = newScoreState.Variant
-                          PlayerCount = newScoreState.Scores.Length
+                          Seats = GameEngine.SeatCount.ofIntOrDefault newScoreState.Scores.Length
                           HumanCount = humanCount
                           Seed = None
                           TargetScore = newScoreState.TargetScore

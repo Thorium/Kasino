@@ -47,7 +47,7 @@ let private updateScreen (input: Input.InputState) (dt: float) =
         | MenuScreen.Ready ->
             let config: GameEngine.GameConfig =
                 { Variant = newMenu.Variant
-                  PlayerCount = newMenu.PlayerCount
+                  Seats = GameEngine.SeatCount.ofIntOrDefault newMenu.PlayerCount
                   HumanCount = newMenu.HumanCount
                   Seed = None
                   TargetScore = 16
@@ -113,7 +113,7 @@ let private updateScreen (input: Input.InputState) (dt: float) =
                     |> List.length
                 let config: GameEngine.GameConfig =
                     { Variant = newScoreState.Variant
-                      PlayerCount = newScoreState.Scores.Length
+                      Seats = GameEngine.SeatCount.ofIntOrDefault newScoreState.Scores.Length
                       HumanCount = humanCount
                       Seed = None
                       TargetScore = newScoreState.TargetScore
