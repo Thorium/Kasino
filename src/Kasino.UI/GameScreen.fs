@@ -47,7 +47,8 @@ module GameScreen =
         { Card: Card
           FromX: float32; FromY: float32       // screen-space start position
           ToX: float32; ToY: float32           // screen-space end position
-          Duration: float }                    // seconds for the slide
+          Duration: float                      // seconds for the slide
+          Highlight: bool }                    // human plays slide highlighted so they read as yours
 
     /// Collect animation: captured table cards slide toward the player
     and CollectAnimation =
@@ -98,7 +99,10 @@ module GameScreen =
     let private computerDelay = 0.8
     let private animDelay = 1.4        // slightly longer to fit collect animation
     let private shuffleDuration = 0.6
-    let private cardSlideDuration = 0.25
+    // Slow enough to register — at 0.25s a player's own play was over before
+    // their eyes returned from the click, and the computer's reply slide was
+    // routinely mistaken for it.
+    let private cardSlideDuration = 0.4
     let private collectSlideDuration = 0.35
     let private dealStepDuration = 0.18         // seconds per deal step (pair of cards slides)
 
@@ -287,7 +291,7 @@ module GameScreen =
             (scatteredPos: Map<Card, (int * int * float32)>)
             (tableCards: Card list) (tableCount: int) =
         match playResult with
-        | Capture(_, captured, _) when not (List.isEmpty captured) ->
+        | Capture(hc, captured, _) when not (List.isEmpty captured) ->
             let destX, destY =
                 if isBottom then float32 (screenW / 2), float32 (screenH - 10)   // slide off bottom
                 else float32 (screenW / 2), 0.0f                                  // slide off top
@@ -300,7 +304,14 @@ module GameScreen =
                         let idx = tableCards |> List.tryFindIndex ((=) card) |> Option.defaultValue 0
                         let r = tableCardRect screenW screenH tableCount idx
                         (card, float32 (r.X + r.Width / 2), float32 (r.Y + r.Height / 2)))
-            Some { Cards = cards; ToX = destX; ToY = destY
+            // The played card is banked with the capture: after its slide
+            // deposits it at the table centre, it visibly rides along to the
+            // pile instead of vanishing there. Appended last so it draws on
+            // top of the captured cards.
+            let tArea = tableArea screenW screenH
+            let playedFrom =
+                (hc, float32 (tArea.X + tArea.Width / 2), float32 (tArea.Y + tArea.Height / 2))
+            Some { Cards = cards @ [ playedFrom ]; ToX = destX; ToY = destY
                    StartTime = cardSlideDuration; Duration = collectSlideDuration }
         | _ -> None
 
@@ -448,12 +459,20 @@ module GameScreen =
 
     /// Apply an already-resolved human turn to the screen: build the play and
     /// collect animations and advance to AnimatingPlay. Shared by the plain
-    /// play, chosen-capture, and place-instead paths.
-    let private finishHumanPlay (screen: ScreenState) (cardIndex: int) (turnResult: GameEngine.TurnResult) (screenW: int) (screenH: int) =
+    /// play, chosen-capture, and place-instead paths. fromPos (a pointer
+    /// position) lets a drag-released card continue its slide from the drop
+    /// point instead of snapping back to its hand slot.
+    let private finishHumanPlay (screen: ScreenState) (cardIndex: int) (fromPos: (float32 * float32) option) (turnResult: GameEngine.TurnResult) (screenW: int) (screenH: int) =
         let gs = screen.GameState
         let player = gs.Players[gs.CurrentPlayerIndex]
         let card = player.Hand[cardIndex]
-        let fromRect = handCardRect screenW screenH player.Hand.Length cardIndex true
+        let fromRect =
+            match fromPos with
+            | Some(px, py) ->
+                Rectangle(int px - CardRenderer.scaledWidth() / 2,
+                          int py - CardRenderer.scaledHeight() / 2,
+                          CardRenderer.scaledWidth(), CardRenderer.scaledHeight())
+            | None -> handCardRect screenW screenH player.Hand.Length cardIndex true
         // Build collect animation from pre-play table positions
         let collectAnim =
             buildCollectAnimation turnResult.PlayResult true screenW screenH
@@ -481,7 +500,8 @@ module GameScreen =
               FromX = float32 fromRect.X
               FromY = float32 fromRect.Y
               ToX = toX; ToY = toY
-              Duration = cardSlideDuration }
+              Duration = cardSlideDuration
+              Highlight = true }
         let msg = formatPlayResult player.Name turnResult.PlayResult
         { screen with
             GameState = turnResult.NewState
@@ -490,8 +510,9 @@ module GameScreen =
             ScatteredPositions = newScattered
             Phase = AnimatingPlay(0.0, turnResult.Evaluation, Some cardAnim, collectAnim) }
 
-    /// Play a human card (single option or no captures)
-    let private processHumanPlay (screen: ScreenState) (cardIndex: int) (screenW: int) (screenH: int) =
+    /// Play a human card (single option or no captures), optionally sliding
+    /// from a drag-release point.
+    let private processHumanPlayFrom (screen: ScreenState) (cardIndex: int) (fromPos: (float32 * float32) option) (screenW: int) (screenH: int) =
         let gs = screen.GameState
         let player = gs.Players[gs.CurrentPlayerIndex]
         let card = player.Hand[cardIndex]
@@ -501,16 +522,20 @@ module GameScreen =
             // Multiple capture options — show choice dialog
             { screen with Phase = ChoosingCaptureOption(cardIndex, options, 0); SelectedCardIndex = None }
         | _ ->
-            finishHumanPlay screen cardIndex (GameEngine.playHumanTurn gs cardIndex None) screenW screenH
+            finishHumanPlay screen cardIndex fromPos (GameEngine.playHumanTurn gs cardIndex None) screenW screenH
+
+    /// Play a human card (single option or no captures)
+    let private processHumanPlay (screen: ScreenState) (cardIndex: int) (screenW: int) (screenH: int) =
+        processHumanPlayFrom screen cardIndex None screenW screenH
 
     /// Process a chosen capture option (from button tap or keyboard)
     let private processCapture (screen: ScreenState) (cardIdx: int) (chosen: Rules.CaptureOption) (screenW: int) (screenH: int) =
-        finishHumanPlay screen cardIdx (GameEngine.playHumanTurn screen.GameState cardIdx (Some chosen)) screenW screenH
+        finishHumanPlay screen cardIdx None (GameEngine.playHumanTurn screen.GameState cardIdx (Some chosen)) screenW screenH
 
     /// Place a capture-capable card without capturing (Standard Kasino only,
     /// where capturing is optional).
     let private processHumanPlace (screen: ScreenState) (cardIndex: int) (screenW: int) (screenH: int) =
-        finishHumanPlay screen cardIndex (GameEngine.playHumanPlaceTurn screen.GameState cardIndex) screenW screenH
+        finishHumanPlay screen cardIndex None (GameEngine.playHumanPlaceTurn screen.GameState cardIndex) screenW screenH
 
     let update (input: InputHandler.InputState) (dt: float) (screenW: int) (screenH: int) (screen: ScreenState) =
         let gs = screen.GameState
@@ -715,9 +740,11 @@ module GameScreen =
                         // It was a real drag — check if dropped on table area
                         let tArea = tableArea screenW screenH
                         if tArea.Contains(input.Mouse.Position) then
-                            // Play the card
+                            // Play the card, continuing the slide from the drop
+                            // point rather than snapping back to the hand slot.
                             let newScreen = { screen with DragState = NotDragging }
-                            processHumanPlay newScreen idx screenW screenH
+                            let dropPos = (float32 input.Mouse.Position.X, float32 input.Mouse.Position.Y)
+                            processHumanPlayFrom newScreen idx (Some dropPos) screenW screenH
                         else
                             // Dropped outside table — cancel drag, keep selected
                             { screen with DragState = NotDragging; SelectedCardIndex = Some idx }
@@ -766,7 +793,8 @@ module GameScreen =
                                FromX = float32 fromRect.X
                                FromY = float32 fromRect.Y
                                ToX = toX; ToY = toY
-                               Duration = cardSlideDuration }
+                               Duration = cardSlideDuration
+                               Highlight = false }
                     else None
                 let msg = formatPlayResult player.Name turnResult.PlayResult
                 let newChat =
@@ -1134,7 +1162,12 @@ module GameScreen =
             let eased = 1.0f - (1.0f - t) * (1.0f - t)
             let x = int (anim.FromX + (anim.ToX - anim.FromX) * eased)
             let y = int (anim.FromY + (anim.ToY - anim.FromY) * eased)
-            CardRenderer.drawCard sb textures anim.Card x y
+            // Human plays slide highlighted so the player's own move is
+            // unmistakable amid the computer's reply animation.
+            if anim.Highlight then
+                CardRenderer.drawCardHighlighted sb textures anim.Card x y Color.LimeGreen
+            else
+                CardRenderer.drawCard sb textures anim.Card x y
         | _ -> ()
 
         // ── Collect animation: captured cards slide to player ──
