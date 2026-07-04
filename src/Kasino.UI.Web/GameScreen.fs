@@ -19,7 +19,7 @@ module GameScreen =
         | WaitingForHuman
         | ComputerThinking of elapsed: float
         | AnimatingPlay of elapsed: float * AI.PlayEvaluation * cardAnim: CardAnimation option * collectAnim: CollectAnimation option
-        | ChoosingCaptureOption of cardIndex: int * Rules.CaptureOption list
+        | ChoosingCaptureOption of cardIndex: int * Rules.CaptureOption list * page: int
         | RoundOver
         | GameOver
 
@@ -287,19 +287,58 @@ module GameScreen =
     let private continueButton (screenW: int) (screenH: int) =
         Button.createCentered "Continue" screenW (screenH / 2 + 60) 200 52 (Color.rgb 40 80 140) Color.White
 
-    let private captureOptionButtons (options: Rules.CaptureOption list) (screenW: int) (screenH: int) =
-        let totalH = options.Length * 56 + 64
-        let baseY = (screenH - totalH) / 2
-        options
-        |> List.mapi (fun i opt ->
-            let cards = opt.Captured |> List.map Cards.display |> String.concat " "
-            let label = sprintf "%d: %s (%d cards)" (i + 1) cards opt.Captured.Length
-            Button.createCentered label screenW (baseY + i * 56) 450 48 (Color.rgb 60 80 60) Color.White)
+    /// Small "Place Instead" button — offered beside the Play button in
+    /// Standard Kasino, where capturing is optional.
+    let private placeInsteadButton (screenW: int) (screenH: int) =
+        Button.create "Place Instead" (screenW / 2 + 130) (screenH - CardRenderer.scaledHeight () - 80) 170 52 (Color.rgb 100 100 100) Color.White
 
-    let private cancelButton (optionCount: int) (screenW: int) (screenH: int) =
-        let totalH = optionCount * 56 + 64
-        let baseY = (screenH - totalH) / 2
-        Button.createCentered "Cancel" screenW (baseY + optionCount * 56 + 8) 180 48 (Color.rgb 120 40 40) Color.White
+    /// The capture-choice modal, paginated so it always fits on screen
+    /// (findCaptureOptions can return up to 64 options).
+    type private CaptureModal =
+        { OptionButtons: (int * Button.ButtonDef) list   // absolute option index * button
+          MoreButton: Button.ButtonDef option            // cycles to the next page
+          PlaceButton: Button.ButtonDef option           // Standard only: decline the capture
+          CancelButton: Button.ButtonDef
+          PageStart: int
+          VisibleCount: int
+          NextPage: int }
+
+    let private captureModal (variant: GameVariant) (options: Rules.CaptureOption list) (page: int) (screenW: int) (screenH: int) : CaptureModal =
+        let perPage = max 3 ((screenH - 240) / 56)
+        let pageCount = (options.Length + perPage - 1) / perPage
+        let page = ((page % pageCount) + pageCount) % pageCount
+        let startIdx = page * perPage
+        let visible = options |> List.skip startIdx |> List.truncate perPage
+        let allowPlace = (variant = StandardKasino)
+        let navRows = if pageCount > 1 then 1 else 0
+        let placeRows = if allowPlace then 1 else 0
+        let totalH = (visible.Length + navRows + placeRows) * 56 + 64
+        let baseY = max 20 ((screenH - totalH) / 2)
+        let optButtons =
+            visible
+            |> List.mapi (fun i opt ->
+                let cards = opt.Captured |> List.map Cards.display |> String.concat " "
+                let label = sprintf "%d: %s (%d cards)" (i + 1) cards opt.Captured.Length
+                (startIdx + i, Button.createCentered label screenW (baseY + i * 56) 450 48 (Color.rgb 60 80 60) Color.White))
+        let navY = baseY + visible.Length * 56
+        let moreButton =
+            if pageCount > 1 then
+                Some (Button.createCentered (sprintf "More options (%d/%d)" (page + 1) pageCount) screenW navY 450 48 (Color.rgb 60 60 100) Color.White)
+            else None
+        let placeY = navY + navRows * 56
+        let placeButton =
+            if allowPlace then
+                Some (Button.createCentered "Place on table instead" screenW placeY 450 48 (Color.rgb 100 100 100) Color.White)
+            else None
+        let cancelBtn =
+            Button.createCentered "Cancel" screenW (placeY + placeRows * 56 + 8) 180 48 (Color.rgb 120 40 40) Color.White
+        { OptionButtons = optButtons
+          MoreButton = moreButton
+          PlaceButton = placeButton
+          CancelButton = cancelBtn
+          PageStart = startIdx
+          VisibleCount = visible.Length
+          NextPage = (page + 1) % pageCount }
 
     // ── Initialization ──────────────────────────────────────
     let create (config: GameEngine.GameConfig) (rng: Random) (players: Player list) (roundNumber: int) (scores: Map<string, int>) =
@@ -349,6 +388,46 @@ module GameScreen =
                 | Human -> { screen with Phase = WaitingForHuman; SelectedCardIndex = None; HoveredCardIndex = None }
                 | Computer -> { screen with Phase = ComputerThinking 0.0 }
 
+    /// Apply an already-resolved human turn to the screen: build the play and
+    /// collect animations and advance to AnimatingPlay. Shared by the plain
+    /// play, chosen-capture, and place-instead paths.
+    let private finishHumanPlay (screen: ScreenState) (cardIndex: int) (turnResult: GameEngine.TurnResult) (screenW: int) (screenH: int) =
+        let gs = screen.GameState
+        let player = gs.Players[gs.CurrentPlayerIndex]
+        let card = player.Hand[cardIndex]
+        let fromRect = handCardRect screenW screenH player.Hand.Length cardIndex true
+        let collectAnim =
+            buildCollectAnimation turnResult.PlayResult true screenW screenH screen.ScatteredPositions gs.Table (List.length gs.Table)
+        let toX, toY, newScattered =
+            match turnResult.PlayResult, screen.TableLayout with
+            | Place _, RandomScatter ->
+                let newPos = computeScatteredPositions turnResult.NewState.Table screenW screenH screen.ScatteredPositions
+                match Map.tryFind card newPos with
+                | Some(sx, sy, _) ->
+                    (float (sx - CardRenderer.scaledWidth () / 2), float (sy - CardRenderer.scaledHeight () / 2), newPos)
+                | None ->
+                    let tArea = tableArea screenW screenH
+                    (float (tArea.X + tArea.Width / 2 - CardRenderer.scaledWidth () / 2),
+                     float (tArea.Y + tArea.Height / 2 - CardRenderer.scaledHeight () / 2), newPos)
+            | _ ->
+                let tArea = tableArea screenW screenH
+                (float (tArea.X + tArea.Width / 2 - CardRenderer.scaledWidth () / 2),
+                 float (tArea.Y + tArea.Height / 2 - CardRenderer.scaledHeight () / 2), screen.ScatteredPositions)
+        let cardAnim =
+            { Card = card
+              FromX = float fromRect.X
+              FromY = float fromRect.Y
+              ToX = toX
+              ToY = toY
+              Duration = cardSlideDuration }
+        let msg = formatPlayResult player.Name turnResult.PlayResult
+        { screen with
+            GameState = turnResult.NewState
+            LastPlayMessage = msg
+            SelectedCardIndex = None
+            ScatteredPositions = newScattered
+            Phase = AnimatingPlay(0.0, turnResult.Evaluation, Some cardAnim, collectAnim) }
+
     let private processHumanPlay (screen: ScreenState) (cardIndex: int) (screenW: int) (screenH: int) =
         let gs = screen.GameState
         let player = gs.Players[gs.CurrentPlayerIndex]
@@ -356,64 +435,17 @@ module GameScreen =
         let options = Rules.findCaptureOptions card gs.Table
         match options with
         | _ :: _ :: _ ->
-            { screen with Phase = ChoosingCaptureOption(cardIndex, options); SelectedCardIndex = None }
+            { screen with Phase = ChoosingCaptureOption(cardIndex, options, 0); SelectedCardIndex = None }
         | _ ->
-            let fromRect = handCardRect screenW screenH player.Hand.Length cardIndex true
-            let turnResult = GameEngine.playHumanTurn gs cardIndex None
-            let collectAnim =
-                buildCollectAnimation turnResult.PlayResult true screenW screenH screen.ScatteredPositions gs.Table (List.length gs.Table)
-            let toX, toY, newScattered =
-                match turnResult.PlayResult, screen.TableLayout with
-                | Place _, RandomScatter ->
-                    let newPos = computeScatteredPositions turnResult.NewState.Table screenW screenH screen.ScatteredPositions
-                    match Map.tryFind card newPos with
-                    | Some(sx, sy, _) ->
-                        (float (sx - CardRenderer.scaledWidth () / 2), float (sy - CardRenderer.scaledHeight () / 2), newPos)
-                    | None ->
-                        let tArea = tableArea screenW screenH
-                        (float (tArea.X + tArea.Width / 2 - CardRenderer.scaledWidth () / 2),
-                         float (tArea.Y + tArea.Height / 2 - CardRenderer.scaledHeight () / 2), newPos)
-                | _ ->
-                    let tArea = tableArea screenW screenH
-                    (float (tArea.X + tArea.Width / 2 - CardRenderer.scaledWidth () / 2),
-                     float (tArea.Y + tArea.Height / 2 - CardRenderer.scaledHeight () / 2), screen.ScatteredPositions)
-            let cardAnim =
-                { Card = card
-                  FromX = float fromRect.X
-                  FromY = float fromRect.Y
-                  ToX = toX
-                  ToY = toY
-                  Duration = cardSlideDuration }
-            let msg = formatPlayResult player.Name turnResult.PlayResult
-            { screen with
-                GameState = turnResult.NewState
-                LastPlayMessage = msg
-                SelectedCardIndex = None
-                ScatteredPositions = newScattered
-                Phase = AnimatingPlay(0.0, turnResult.Evaluation, Some cardAnim, collectAnim) }
+            finishHumanPlay screen cardIndex (GameEngine.playHumanTurn gs cardIndex None) screenW screenH
 
     let private processCapture (screen: ScreenState) (cardIdx: int) (chosen: Rules.CaptureOption) (screenW: int) (screenH: int) =
-        let gs = screen.GameState
-        let player = gs.Players[gs.CurrentPlayerIndex]
-        let card = player.Hand[cardIdx]
-        let fromRect = handCardRect screenW screenH player.Hand.Length cardIdx true
-        let turnResult = GameEngine.playHumanTurn gs cardIdx (Some chosen)
-        let collectAnim =
-            buildCollectAnimation turnResult.PlayResult true screenW screenH screen.ScatteredPositions gs.Table (List.length gs.Table)
-        let tArea = tableArea screenW screenH
-        let cardAnim =
-            { Card = card
-              FromX = float fromRect.X
-              FromY = float fromRect.Y
-              ToX = float (tArea.X + tArea.Width / 2 - CardRenderer.scaledWidth () / 2)
-              ToY = float (tArea.Y + tArea.Height / 2 - CardRenderer.scaledHeight () / 2)
-              Duration = cardSlideDuration }
-        let msg = formatPlayResult player.Name turnResult.PlayResult
-        { screen with
-            GameState = turnResult.NewState
-            LastPlayMessage = msg
-            SelectedCardIndex = None
-            Phase = AnimatingPlay(0.0, turnResult.Evaluation, Some cardAnim, collectAnim) }
+        finishHumanPlay screen cardIdx (GameEngine.playHumanTurn screen.GameState cardIdx (Some chosen)) screenW screenH
+
+    /// Place a capture-capable card without capturing (Standard Kasino only,
+    /// where capturing is optional).
+    let private processHumanPlace (screen: ScreenState) (cardIndex: int) (screenW: int) (screenH: int) =
+        finishHumanPlay screen cardIndex (GameEngine.playHumanPlaceTurn screen.GameState cardIndex) screenW screenH
 
     let update (input: Input.InputState) (dt: float) (screenW: int) (screenH: int) (screen: ScreenState) =
         let gs = screen.GameState
@@ -432,6 +464,34 @@ module GameScreen =
                 let newPositions = computeScatteredPositions gs.Table screenW screenH screen.ScatteredPositions
                 { screen with ScatteredPositions = newPositions }
             | StrictGrid -> screen
+
+        // ── Global controls ─────────────────────────────────
+        // The "?", Menu, and layout buttons are drawn in every phase except
+        // the capture modal, so they must also react in every such phase —
+        // notably watch-AI-only games, which never reach WaitingForHuman.
+        // Escape likewise returns to the menu from phases that have no
+        // Escape handling of their own.
+        let inCaptureModal =
+            match screen.Phase with ChoosingCaptureOption _ -> true | _ -> false
+        let escapeToMenu =
+            match screen.Phase with
+            | WaitingForHuman | ChoosingCaptureOption _ -> false  // handled per-phase
+            | _ -> input.Keyboard.IsEscapePressed
+
+        if not inCaptureModal && Button.isClicked input (helpButton screenW) then
+            { screen with ShowRulesClicked = true }
+        elif not inCaptureModal && Button.isClicked input (menuButton screenW) then
+            { screen with MenuClicked = true }
+        elif not inCaptureModal && Button.isClicked input (layoutToggleButton screenW screen.TableLayout) then
+            let newLayout = match screen.TableLayout with StrictGrid -> RandomScatter | RandomScatter -> StrictGrid
+            let newScatter =
+                match newLayout with
+                | RandomScatter -> computeScatteredPositions gs.Table screenW screenH Map.empty
+                | StrictGrid -> Map.empty
+            { screen with TableLayout = newLayout; ScatteredPositions = newScatter }
+        elif escapeToMenu then
+            { screen with MenuClicked = true }
+        else
 
         match screen.Phase with
         | Shuffling elapsed ->
@@ -454,30 +514,20 @@ module GameScreen =
                     { screen with Phase = Dealing(step, newElapsed, steps) }
 
         | WaitingForHuman ->
-            let hBtn = helpButton screenW
-            if Button.isClicked input hBtn then
-                { screen with ShowRulesClicked = true }
-            else
-
-            let mBtn = menuButton screenW
-            if Button.isClicked input mBtn then
-                { screen with MenuClicked = true }
-            else
-
-            let ltBtn = layoutToggleButton screenW screen.TableLayout
-            if Button.isClicked input ltBtn then
-                let newLayout = match screen.TableLayout with StrictGrid -> RandomScatter | RandomScatter -> StrictGrid
-                let newScatter =
-                    match newLayout with
-                    | RandomScatter -> computeScatteredPositions gs.Table screenW screenH Map.empty
-                    | StrictGrid -> Map.empty
-                { screen with TableLayout = newLayout; ScatteredPositions = newScatter }
-            else
-
+            // Build card rects for current player's hand. Selected/hovered
+            // cards are drawn lifted by 15/10 px, so extend the hit rect
+            // upward by the same amount — otherwise clicking the visible top
+            // edge of a raised card misses it and deselects instead.
             let player = gs.Players[gs.CurrentPlayerIndex]
             let rects =
                 player.Hand
-                |> List.mapi (fun i _ -> (i, handCardRect screenW screenH player.Hand.Length i true))
+                |> List.mapi (fun i _ ->
+                    let r = handCardRect screenW screenH player.Hand.Length i true
+                    let lift =
+                        if screen.SelectedCardIndex = Some i then 15
+                        elif screen.HoveredCardIndex = Some i then 10
+                        else 0
+                    (i, { r with Y = r.Y - lift; Height = r.Height + lift }))
 
             let hovered =
                 match screen.DragState with
@@ -538,11 +588,19 @@ module GameScreen =
                             SelectedCardIndex = Some idx
                             DragState = Dragging(idx, input.Mouse.Position, input.Mouse.Position) }
                     | None ->
-                        // Tapped outside the hand. Priority: Play button, then nudge a
-                        // table card (scatter mode only — the grid never overlaps), else deselect.
+                        // Tapped outside the hand. Priority: Play button, then Place
+                        // Instead (Standard: capturing is optional), then nudge a
+                        // table card (scatter mode only — the grid never overlaps),
+                        // else deselect.
                         let btn = playButton screenW screenH preview
+                        let canPlaceInstead =
+                            gs.Variant = StandardKasino
+                            && (match preview with NoCapture -> false | _ -> true)
                         if screen.SelectedCardIndex.IsSome && Button.isClicked input btn then
                             processHumanPlay screen screen.SelectedCardIndex.Value screenW screenH
+                        elif screen.SelectedCardIndex.IsSome && canPlaceInstead
+                             && Button.isClicked input (placeInsteadButton screenW screenH) then
+                            processHumanPlace screen screen.SelectedCardIndex.Value screenW screenH
                         else
                             let tableCardOpt =
                                 if screen.TableLayout = RandomScatter
@@ -609,12 +667,19 @@ module GameScreen =
                         let tArea = tableArea screenW screenH
                         (float (tArea.X + tArea.Width / 2 - CardRenderer.scaledWidth () / 2),
                          float (tArea.Y + tArea.Height / 2 - CardRenderer.scaledHeight () / 2), screen.ScatteredPositions)
+                // Animate the card the AI actually played (from its real slot
+                // in the hand), not Hand[0] — anything else leaks a hidden
+                // card face-up and breaks the in-flight table suppression.
+                let playedCard =
+                    match turnResult.PlayResult with
+                    | Capture(hc, _, _) | Place hc -> hc
                 let cardAnim =
                     if not (List.isEmpty player.Hand) then
                         let oppHandSize = List.length player.Hand
-                        let fromRect = handCardRect screenW screenH oppHandSize 0 false
+                        let cardIdx = player.Hand |> List.tryFindIndex ((=) playedCard) |> Option.defaultValue 0
+                        let fromRect = handCardRect screenW screenH oppHandSize cardIdx false
                         Some
-                            { Card = player.Hand[0]
+                            { Card = playedCard
                               FromX = float fromRect.X
                               FromY = float fromRect.Y
                               ToX = toX
@@ -650,26 +715,29 @@ module GameScreen =
             else
                 { screen with Phase = AnimatingPlay(newElapsed, eval, cardAnim, collectAnim) }
 
-        | ChoosingCaptureOption(cardIdx, options) ->
-            let optButtons = captureOptionButtons options screenW screenH
-            match Button.findClicked input optButtons with
-            | Some n -> processCapture screen cardIdx options[n] screenW screenH
+        | ChoosingCaptureOption(cardIdx, options, page) ->
+            let modal = captureModal gs.Variant options page screenW screenH
+            // Touch: check the visible capture option buttons
+            let clickedOption =
+                modal.OptionButtons |> List.tryFind (fun (_, b) -> Button.isClicked input b)
+            match clickedOption with
+            | Some (optIdx, _) ->
+                processCapture screen cardIdx options[optIdx] screenW screenH
             | None ->
-                let cancel = cancelButton options.Length screenW screenH
-                if Button.isClicked input cancel || input.Keyboard.IsEscapePressed then
+                if (match modal.MoreButton with Some b -> Button.isClicked input b | None -> false) then
+                    { screen with Phase = ChoosingCaptureOption(cardIdx, options, modal.NextPage) }
+                elif (match modal.PlaceButton with Some b -> Button.isClicked input b | None -> false) then
+                    processHumanPlace screen cardIdx screenW screenH
+                elif Button.isClicked input modal.CancelButton || input.Keyboard.IsEscapePressed then
                     { screen with Phase = WaitingForHuman; SelectedCardIndex = None }
                 else
+                    // Keyboard fallback: number keys pick from the visible page
                     match input.Keyboard.NumberPressed with
-                    | Some n when n >= 1 && n <= options.Length ->
-                        processCapture screen cardIdx options[n - 1] screenW screenH
+                    | Some n when n >= 1 && n <= modal.VisibleCount ->
+                        processCapture screen cardIdx options[modal.PageStart + n - 1] screenW screenH
                     | _ -> screen
 
         | RoundOver ->
-            let ltBtn = layoutToggleButton screenW screen.TableLayout
-            if Button.isClicked input ltBtn then
-                let newLayout = match screen.TableLayout with StrictGrid -> RandomScatter | RandomScatter -> StrictGrid
-                { screen with TableLayout = newLayout; ScatteredPositions = Map.empty }
-            else
             let btn = continueButton screenW screenH
             if Button.isClicked input btn || input.Keyboard.IsEnterPressed then
                 { screen with ContinueClicked = true }
@@ -795,9 +863,17 @@ module GameScreen =
                     CardRenderer.drawCardHighlighted g textures human.Hand[idx] drawX drawY Color.LimeGreen
             | _ -> ()
 
+            // Play button when a card is selected (and not dragging), plus
+            // "Place Instead" when declining the capture is legal (Standard
+            // Kasino, card can capture).
             match screen.Phase, screen.SelectedCardIndex, screen.DragState with
             | WaitingForHuman, Some _, NotDragging ->
                 Button.draw g input (playButton screenW screenH screen.CapturePreview)
+                let canPlaceInstead =
+                    gs.Variant = StandardKasino
+                    && (match screen.CapturePreview with NoCapture -> false | _ -> true)
+                if canPlaceInstead then
+                    Button.draw g input (placeInsteadButton screenW screenH)
             | _ -> ()
         else
             let curIdx = gs.CurrentPlayerIndex
@@ -951,20 +1027,23 @@ module GameScreen =
 
         // ── Modal overlays ──
         match screen.Phase with
-        | ChoosingCaptureOption(_, options) ->
+        | ChoosingCaptureOption(_, options, page) ->
             Gfx.fillRect g { X = 0; Y = 0; Width = screenW; Height = screenH } (Color.rgba 0 0 0 160)
+
+            let modal = captureModal gs.Variant options page screenW screenH
 
             let headerText = "Choose which cards to capture:"
             let headerSize = Gfx.measure g headerText
-            let optButtons = captureOptionButtons options screenW screenH
             let headerY =
-                match optButtons with
-                | btn :: _ -> float btn.Rect.Y - headerSize.Y - 12.0
+                match modal.OptionButtons with
+                | (_, btn) :: _ -> float btn.Rect.Y - headerSize.Y - 12.0
                 | [] -> float (screenH / 2 - 80)
             Gfx.fillText g headerText (float screenW / 2.0 - headerSize.X / 2.0) headerY Color.Gold
 
-            Button.drawAll g input optButtons
-            Button.draw g input (cancelButton options.Length screenW screenH)
+            Button.drawAll g input (modal.OptionButtons |> List.map snd)
+            modal.MoreButton |> Option.iter (Button.draw g input)
+            modal.PlaceButton |> Option.iter (Button.draw g input)
+            Button.draw g input modal.CancelButton
 
         | RoundOver -> Button.draw g input (continueButton screenW screenH)
 

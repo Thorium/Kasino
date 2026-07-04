@@ -102,7 +102,11 @@ module Input =
 
         // A cancelled pointer (touch interrupted, pointer lost, window blur)
         // must release the held button so a drag can't get stuck mid-gesture.
-        let release (_: Event) = leftDown <- false
+        // Held keys are cleared too: their keyup fires at the other window,
+        // so they would otherwise stay latched and dead for the session.
+        let release (_: Event) =
+            leftDown <- false
+            downKeys <- Set.empty
         window.addEventListener ("pointercancel", release)
         window.addEventListener ("blur", release)
 
@@ -111,24 +115,27 @@ module Input =
 
         window.addEventListener ("keydown", fun e ->
             let k = e :?> KeyboardEvent
-            let key = k.key
             // Edge-detect: only fire "just pressed" on the down transition,
-            // ignoring auto-repeat while the key is held.
-            if not (Set.contains key downKeys) then
-                downKeys <- Set.add key downKeys
-                match key with
+            // ignoring auto-repeat while the key is held. Track the physical
+            // key (code), not the logical key string: modifiers can change
+            // the string between press and release (press "3", hold Shift,
+            // release delivers "#"), which would latch the entry forever.
+            let code = k.code
+            if not (Set.contains code downKeys) then
+                downKeys <- Set.add code downKeys
+                match k.key with
                 | "Escape" -> escJust <- true
                 | "Enter" -> enterJust <- true
                 | "ArrowLeft" -> leftKeyJust <- true
                 | "ArrowRight" -> rightKeyJust <- true
-                | _ ->
-                    match parseDigit key k.code with
+                | key ->
+                    match parseDigit key code with
                     | Some n -> numberJust <- Some n
                     | None -> ())
 
         window.addEventListener ("keyup", fun e ->
             let k = e :?> KeyboardEvent
-            downKeys <- Set.remove k.key downKeys)
+            downKeys <- Set.remove k.code downKeys)
 
     /// Produce the current frame's input and reset per-frame edge flags.
     let snapshot () : InputState =

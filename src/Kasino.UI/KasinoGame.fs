@@ -74,6 +74,7 @@ type KasinoGame() as this =
     let mutable settings = Settings.defaultSettings
     let mutable rng = Random()
     let mutable lastInput: InputHandler.InputState = InputHandler.defaultState
+    let mutable wasActive = true
 
     let screenW () = graphics.PreferredBackBufferWidth
     let screenH () = graphics.PreferredBackBufferHeight
@@ -171,7 +172,15 @@ type KasinoGame() as this =
         CardRenderer.Scale <- float32 (screenH()) / 768.0f * 1.0f
 
     override _.Update(gameTime) =
-        let input = InputHandler.update()
+        // Always run InputHandler.update so its previous-state tracking stays
+        // current, but discard the result while the window is unfocused — and
+        // on the very frame focus returns, so the click that focuses the
+        // window can't also play a card.
+        let rawInput = InputHandler.update()
+        let isActive = this.IsActive
+        let input =
+            if isActive && wasActive then rawInput else InputHandler.defaultState
+        wasActive <- isActive
         lastInput <- input
         let dt = gameTime.ElapsedGameTime.TotalSeconds
 

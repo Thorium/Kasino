@@ -119,14 +119,22 @@ module ScoreScreen =
                     else Color.White
                 drawLeft rows[i] x y color)
 
+        // Winner announcement. An exact tie for the deciding score names
+        // every tied player rather than an arbitrary one.
         match state.Phase with
         | GameOver ->
-            let winner =
+            let scores = state.CumulativeScores |> Map.toList
+            let bestScore =
                 match state.Variant with
-                | StandardKasino -> state.CumulativeScores |> Map.toList |> List.maxBy snd
-                | LaistoKasino -> state.CumulativeScores |> Map.toList |> List.minBy snd
+                | StandardKasino -> scores |> List.map snd |> List.max
+                | LaistoKasino   -> scores |> List.map snd |> List.min
+            let winners = scores |> List.filter (fun (_, s) -> s = bestScore) |> List.map fst
             let winnerY = startY + 30 + categories.Length * 24 + 20
-            drawCentered (sprintf "%s wins with %d points!" (fst winner) (snd winner)) winnerY Color.Gold
+            let text =
+                match winners with
+                | [ w ] -> sprintf "%s wins with %d points!" w bestScore
+                | ws -> sprintf "%s tie with %d points!" (String.concat " & " ws) bestScore
+            drawCentered text winnerY Color.Gold
         | RoundSummary -> ()
 
         Button.draw g input (actionButton screenW screenH state.Phase)
