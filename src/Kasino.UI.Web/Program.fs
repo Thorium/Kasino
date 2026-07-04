@@ -152,34 +152,64 @@ let private drawAll (g: Gfx) (input: Input.InputState) =
 
 // ── Bootstrap ───────────────────────────────────────────────
 let private canvas = document.getElementById "game" :?> HTMLCanvasElement
+let private ctx: obj = canvas?getContext ("2d")
+let private g = Gfx.create ctx
 
-// Size the canvas backing store to the viewport's aspect ratio (fixed
-// logical height, clamped logical width). The CSS sizes the element to fit
-// while preserving this ratio, so landscape fills the screen with no
-// letterbox; pointer coordinates are mapped back through the backing-store
-// size in Input.fs.
-let private logicalHeight = 768
-let private minLogicalWidth = 1024
+// The logical drawing space tracks the viewport's aspect ratio so the
+// canvas can FILL the screen (scaling up as well as down — large screens
+// used to show the board at its intrinsic 1024×768 size surrounded by
+// margins). Wider than 4:3, the space stays 768 tall and grows sideways;
+// squarer/taller than 4:3, it stays 1024 wide and grows downward instead,
+// so half-tiled and portrait-ish windows fill too. Only beyond the clamps
+// (ultra-wide, phone-portrait) does it letter/pillarbox rather than
+// stretch. The backing store is allocated at device resolution with a
+// uniform transform back to logical coordinates so the upscaled board and
+// especially text stay crisp. Pointer positions are mapped into the
+// logical space in Input.fs.
+let private baseLogicalHeight = 768
+let private baseLogicalWidth = 1024
 let private maxLogicalWidth = 2048
+let private maxLogicalHeight = 1280
 
 let private resize () =
     let vw = window.innerWidth
     let vh = window.innerHeight
-    let aspect = if vh > 0.0 then vw / vh else 4.0 / 3.0
-    let w =
-        int (round (float logicalHeight * aspect))
-        |> max minLogicalWidth
-        |> min maxLogicalWidth
-    screenW <- w
-    screenH <- logicalHeight
-    canvas?width <- w
-    canvas?height <- logicalHeight
+    // Some embedding contexts report a 0×0 viewport at script evaluation;
+    // keep the current size and wait for the resize event that follows.
+    if vw > 0.0 && vh > 0.0 then
+        let aspect = vw / vh
+        let w, h =
+            if aspect >= float baseLogicalWidth / float baseLogicalHeight then
+                // Wide: fixed height, width tracks the aspect (clamped)
+                let w = int (round (float baseLogicalHeight * aspect)) |> min maxLogicalWidth
+                (w, baseLogicalHeight)
+            else
+                // Tall/square: fixed width, height tracks the aspect (clamped)
+                let h = int (round (float baseLogicalWidth / aspect)) |> min maxLogicalHeight
+                (baseLogicalWidth, h)
+        screenW <- w
+        screenH <- h
+        // CSS box: fill the viewport while preserving the logical aspect
+        // ratio. Within the clamps the logical aspect equals the viewport's,
+        // so the board runs edge-to-edge.
+        let logicalAspect = float w / float h
+        let cssW, cssH =
+            if aspect > logicalAspect then (vh * logicalAspect, vh)
+            else (vw, vw / logicalAspect)
+        // Backing store at device resolution (capped at 2x) for crispness.
+        let dpr = window.devicePixelRatio |> max 1.0 |> min 2.0
+        let scale = cssH * dpr / float h
+        canvas?width <- int (round (float w * scale))
+        canvas?height <- int (round (float h * scale))
+        canvas?style?width <- sprintf "%fpx" cssW
+        canvas?style?height <- sprintf "%fpx" cssH
+        // Assigning canvas.width resets the 2D context state, so reapply
+        // the logical-coordinates transform afterwards.
+        ctx?setTransform (scale, 0.0, 0.0, scale, 0.0, 0.0)
+        Input.setLogicalSize w h
 
 resize ()
 window.addEventListener ("resize", fun _ -> resize ())
-
-let private ctx: obj = canvas?getContext ("2d")
-let private g = Gfx.create ctx
 
 Input.init canvas
 CardRenderer.Scale <- 1.0

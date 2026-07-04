@@ -22,19 +22,17 @@ html, body {
     justify-content: center;
 }
 
-/* The canvas backing store is sized at runtime (Program.fs `resize`) so its
-   aspect ratio matches the viewport — fixed 768 tall, width tracks the
-   device. Scaling it down to fit the viewport (preserving that intrinsic
-   ratio) makes a landscape device fill edge-to-edge with no letterbox, while
-   a portrait device degrades gracefully to a centered, letterboxed board.
-   Pointer coordinates are mapped back through the backing-store size in
-   Input.fs. */
+/* The canvas is sized at runtime (Program.fs `resize`): its logical aspect
+   ratio tracks the viewport (clamped), its CSS box fills the viewport while
+   preserving that ratio (scaling UP on large screens, not just down), and
+   its backing store is allocated at device resolution for crispness. The
+   max constraints below are only a safety net against rounding overshoot;
+   #root's flexbox centers the letter/pillarboxed cases. Pointer coordinates
+   are mapped into the logical space in Input.fs. */
 #game {
     display: block;
     max-width: 100%;
     max-height: 100%;
-    width: auto;
-    height: auto;
     background: #19321f;
     image-rendering: auto;
     touch-action: none; /* let pointer events drive drag & drop */

@@ -45,16 +45,25 @@ module Input =
 
     let mutable private canvasEl: HTMLCanvasElement = Unchecked.defaultof<_>
 
+    // Logical drawing-space size, kept in sync by Program's resize handler.
+    // The backing store is DPR-scaled for crisp rendering, so it can no
+    // longer be read directly to map pointer positions.
+    let mutable private logicalW = 1024.0
+    let mutable private logicalH = 768.0
+
+    /// Record the logical drawing-space size (called from Program.resize).
+    let setLogicalSize (w: int) (h: int) =
+        logicalW <- float w
+        logicalH <- float h
+
     /// Map viewport client coordinates to the canvas's logical space. The
-    /// backing-store size (canvas.width/height) is set at runtime from the
-    /// viewport aspect ratio, so read it live rather than assuming 1024x768.
+    /// logical size is set at runtime from the viewport aspect ratio, so
+    /// read the synced fields rather than assuming 1024x768.
     let private updatePos (clientX: float) (clientY: float) =
         let rect = canvasEl.getBoundingClientRect ()
         if rect.width > 0.0 && rect.height > 0.0 then
-            let backW: float = canvasEl?width
-            let backH: float = canvasEl?height
-            mouseX <- int ((clientX - rect.left) * (backW / rect.width))
-            mouseY <- int ((clientY - rect.top) * (backH / rect.height))
+            mouseX <- int ((clientX - rect.left) * (logicalW / rect.width))
+            mouseY <- int ((clientY - rect.top) * (logicalH / rect.height))
 
     /// Parse a 0-4 shortcut from a KeyboardEvent. Uses `key` (top row / NumPad
     /// with NumLock on) and falls back to the physical `code` ("Digit3",
