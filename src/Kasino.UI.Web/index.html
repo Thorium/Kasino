@@ -5,11 +5,25 @@
     <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
     <title>Kasino - Finnish Card Game</title>
     <link href="./styles.css" rel="stylesheet"/>
+    <link href="./manifest.webmanifest" rel="manifest"/>
+    <link href="./icon-192.png" rel="icon" type="image/png"/>
+    <link href="./apple-touch-icon.png" rel="apple-touch-icon"/>
+    <meta content="#0A5C2E" name="theme-color"/>
+    <meta content="yes" name="mobile-web-app-capable"/>
+    <meta content="yes" name="apple-mobile-web-app-capable"/>
+    <meta content="black-translucent" name="apple-mobile-web-app-status-bar-style"/>
 </head>
 <body>
 <div id="root">
     <canvas id="game" width="1024" height="768" aria-label="Kasino game board" role="img"></canvas>
 </div>
 <script src="./Program.fs.js" type="module"></script>
+<script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js').catch(() => { /* PWA is best-effort */ });
+        });
+    }
+</script>
 </body>
 </html>
