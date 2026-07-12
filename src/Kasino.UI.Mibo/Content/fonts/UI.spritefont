@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SpriteFont for the Mibo (MonoGame content-pipeline) build of Kasino.
+  Bundled DejaVu Sans (permissively licensed, redistributable) so the font
+  compiles the same on every build machine. Rendered scaled down at runtime
+  (see Render.uiScale), so the atlas is built at a slightly larger size for
+  crispness.
+-->
+<XnaContent xmlns:Graphics="Microsoft.Xna.Framework.Content.Pipeline.Graphics">
+  <Asset Type="Graphics:FontDescription">
+    <FontName>UI.ttf</FontName>
+    <Size>32</Size>
+    <Spacing>0</Spacing>
+    <UseKerning>true</UseKerning>
+    <Style>Regular</Style>
+    <DefaultCharacter>?</DefaultCharacter>
+    <CharacterRegions>
+      <CharacterRegion>
+        <Start>&#32;</Start>
+        <End>&#126;</End>
+      </CharacterRegion>
+      <!-- ellipsis (…) used in status text -->
+      <CharacterRegion>
+        <Start>&#8230;</Start>
+        <End>&#8230;</End>
+      </CharacterRegion>
+      <!-- box-drawing glyph used by the score screen separator row -->
+      <CharacterRegion>
+        <Start>&#9472;</Start>
+        <End>&#9472;</End>
+      </CharacterRegion>
+      <!-- card-suit symbols ♠♡♢♣♤♥♦♧ — Cards.display, capture modal, rules text -->
+      <CharacterRegion>
+        <Start>&#9824;</Start>
+        <End>&#9831;</End>
+      </CharacterRegion>
+    </CharacterRegions>
+  </Asset>
+</XnaContent>

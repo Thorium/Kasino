@@ -1,0 +1,67 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Kasino on the Mibo game framework (https://angelmunoz.github.io/Mibo/).
+    Mibo is an Elmish/MVU F# framework over MonoGame; this project targets the
+    DesktopGL (OpenGL) backend, the same backend the plain MonoGame `Kasino.UI`
+    project uses. It reuses `Kasino.Domain` unchanged and re-expresses the whole
+    UI as a functional Model-View-Update program.
+
+    Fonts go through the MonoGame content pipeline (a compiled SpriteFont, see
+    Content/fonts/UI.spritefont) because Mibo's `Draw.text` renders SpriteFonts.
+    Card images are the same PNGs as the MonoGame build, linked from
+    ../Kasino.UI/Content/cards and loaded at runtime via Texture2D.FromStream.
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Kasino.Mibo</RootNamespace>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <!-- The content-pipeline build task infers the platform from this. -->
+    <MonoGamePlatform>DesktopGL</MonoGamePlatform>
+    <!-- Use our explicit FSharp.Core (10.1.301, required by Mibo) instead of
+         the SDK's implicit 10.0.100, which would otherwise win the downgrade. -->
+    <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Render.fs" />
+    <Compile Include="Input.fs" />
+    <Compile Include="CardRenderer.fs" />
+    <Compile Include="Button.fs" />
+    <Compile Include="RulesScreen.fs" />
+    <Compile Include="OptionsScreen.fs" />
+    <Compile Include="MenuScreen.fs" />
+    <Compile Include="GameScreen.fs" />
+    <Compile Include="ScoreScreen.fs" />
+    <Compile Include="Game.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Mibo.MonoGame requires FSharp.Core >= 10.1.301; pin it so it isn't
+         downgraded to the SDK default (which fails to bind at runtime). -->
+    <PackageReference Include="FSharp.Core" Version="10.1.301" />
+    <PackageReference Include="Mibo.MonoGame" Version="2.1.0" />
+    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.4.1" />
+    <PackageReference Include="MonoGame.Content.Builder.Task" Version="3.8.4.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Kasino.Domain\Kasino.Domain.fsproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <MonoGameContentReference Include="Content\Content.mgcb" />
+  </ItemGroup>
+
+  <!-- Reuse the MonoGame build's card PNGs without duplicating them in the repo. -->
+  <ItemGroup>
+    <Content Include="..\Kasino.UI\Content\cards\**\*.png"
+             Link="Content\cards\%(RecursiveDir)%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

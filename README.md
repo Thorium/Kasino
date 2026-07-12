@@ -72,6 +72,25 @@ dotnet run --project src/Kasino.UI/Kasino.UI.fsproj
 dotnet test
 ```
 
+## Mibo version (Elmish game framework)
+
+`src/Kasino.UI.Mibo` is an alternative desktop front-end built on the
+[Mibo](https://angelmunoz.github.io/Mibo/) game framework — an Elmish/MVU F#
+framework over MonoGame. It targets the same DesktopGL (OpenGL) backend as
+`Kasino.UI`, reuses `Kasino.Domain` unchanged, and re-expresses the whole UI as
+a functional Model-View-Update program (a top-level screen model + per-screen
+`update`/`view`, mouse/keyboard delivered as subscriptions).
+
+Fonts use the MonoGame content pipeline (a compiled `SpriteFont`, built from the
+bundled DejaVu Sans in `Content/fonts/`), since Mibo's `Draw.text` renders
+SpriteFonts. Card images are the same PNGs as the MonoGame build, linked from
+`../Kasino.UI/Content/cards`.
+
+```bash
+dotnet tool restore                                   # installs dotnet-mgcb (font pipeline)
+dotnet run --project src/Kasino.UI.Mibo/Kasino.UI.Mibo.fsproj
+```
+
 ## Web version (Fable + Canvas)
 
 `src/Kasino.UI.Web` is a [Fable](https://fable.io/) front-end that reuses

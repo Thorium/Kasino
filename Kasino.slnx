@@ -3,6 +3,7 @@
     <Project Path="src/Kasino.Domain/Kasino.Domain.fsproj" />
     <Project Path="src/Kasino.UI/Kasino.UI.fsproj" />
     <Project Path="src/Kasino.UI.Web/Kasino.UI.Web.fsproj" />
+    <Project Path="src/Kasino.UI.Mibo/Kasino.UI.Mibo.fsproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Kasino.Tests/Kasino.Tests.fsproj" />
