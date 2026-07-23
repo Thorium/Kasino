@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>Kasino.UI</RootNamespace>
     <PublishReadyToRun>false</PublishReadyToRun>
+    <Version>1.0.1</Version>
     <!-- Kasino app icon (four aces, same art as the web PWA icons). -->
     <ApplicationIcon>Icon.ico</ApplicationIcon>
   </PropertyGroup>
