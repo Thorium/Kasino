@@ -52,8 +52,9 @@ module CardRenderer =
     /// All card textures keyed by (Suit, Rank)
     type CardTextures =
         { Cards: Map<Suit * Rank, Texture2D>
-          mutable Back: Texture2D  // currently active card back (one of Backs)
-          Backs: Texture2D[]       // available card-back designs (scenic photos)
+          mutable Back: Texture2D  // currently active deck image (one of Backs)
+          HandBack: Texture2D      // single card back for face-down hand cards
+          Backs: Texture2D[]       // available deck designs (scenic photos with stacked edges)
           Highlight: Texture2D     // yellow highlight border
           TableBg: Texture2D }     // green felt
 
@@ -205,18 +206,20 @@ module CardRenderer =
 
         let highlight = createColorTexture device (Color(255, 255, 0, 128))
 
-        { Cards = cardMap; Back = backs[0]; Backs = backs; Highlight = highlight; TableBg = tableBg }
+        // The scenic backN images are deck-pile art (stacked edges baked in);
+        // face-down cards in hands always use the plain single-card back.
+        { Cards = cardMap; Back = backs[0]; HandBack = defaultBack; Backs = backs; Highlight = highlight; TableBg = tableBg }
 
     /// Pick a random card back for the next game/round (mutates the active Back).
     let pickRandomBack (rng: Random) (textures: CardTextures) =
         if textures.Backs.Length > 0 then
             textures.Back <- textures.Backs[rng.Next textures.Backs.Length]
 
-    /// Get the texture for a specific card (fallback to back if missing)
+    /// Get the texture for a specific card (fallback to the card back if missing)
     let getTexture (textures: CardTextures) (card: Card) =
         match Map.tryFind (card.Suit, card.Rank) textures.Cards with
         | Some tex -> tex
-        | None     -> textures.Back
+        | None     -> textures.HandBack
 
     /// Draw a card at a position
     let drawCard (sb: SpriteBatch) (textures: CardTextures) (card: Card) (x: int) (y: int) =
@@ -224,10 +227,10 @@ module CardRenderer =
         let dest = Rectangle(x, y, scaledWidth(), scaledHeight())
         sb.Draw(tex, dest, Color.White)
 
-    /// Draw a face-down card
+    /// Draw a face-down card (single card back, not the deck image)
     let drawCardBack (sb: SpriteBatch) (textures: CardTextures) (x: int) (y: int) =
         let dest = Rectangle(x, y, scaledWidth(), scaledHeight())
-        sb.Draw(textures.Back, dest, Color.White)
+        sb.Draw(textures.HandBack, dest, Color.White)
 
     /// Cache for per-frame color textures to avoid GPU memory leak
     let private colorTextureCache = System.Collections.Generic.Dictionary<uint32, Texture2D>()

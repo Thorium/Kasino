@@ -84,6 +84,8 @@ module GameScreen =
           LastPlayMessage: string
           RoundNumber: int
           CumulativeScores: Map<string, int>
+          /// Undistributed most-cards/most-spades pot from earlier tied rounds.
+          Carry: Scoring.CarryOver
           Rng: Random
           CardRects: (int * Rectangle) list   // (handIndex, rect) for hit-testing
           TableCardRects: Rectangle list
@@ -135,6 +137,35 @@ module GameScreen =
         let x = centerCards screenW handSize + idx * (CardRenderer.scaledWidth() + cardGap)
         let y = if isBottom then screenH - CardRenderer.scaledHeight() - 20 else 20
         Rectangle(x, y, CardRenderer.scaledWidth(), CardRenderer.scaledHeight())
+
+    /// Which edge of the table a player occupies, viewed from the bottom seat.
+    type private Seat =
+        | SeatBottom
+        | SeatLeft
+        | SeatTop
+        | SeatRight
+
+    /// Seats advance clockwise (seen from above, like poker): the player after
+    /// the bottom seat sits on the left, then the top, then the right — so the
+    /// index turn order reads clockwise around the table. The lone opponent of
+    /// a 2-player game stays at the top.
+    let private seatOf (playerCount: int) (bottomIdx: int) (idx: int) =
+        match playerCount, (idx - bottomIdx + playerCount) % playerCount with
+        | _, 0 -> SeatBottom
+        | 2, _ -> SeatTop
+        | 3, 1 -> SeatLeft
+        | 3, _ -> SeatTop
+        | _, 1 -> SeatLeft
+        | _, 2 -> SeatTop
+        | _, _ -> SeatRight
+
+    /// Top-left position of card i in a side opponent's vertical stack.
+    let private sideCardPos (screenW: int) (screenH: int) (seat: Seat) (handSize: int) (i: int) =
+        let cw = CardRenderer.scaledWidth()
+        let ch = CardRenderer.scaledHeight()
+        let x = match seat with SeatRight -> screenW - cw - 10 | _ -> 10
+        let y = screenH / 2 - (handSize * (ch + 4)) / 2 + i * (ch / 3)
+        (x, y)
 
     /// Get the bounding rectangle for a table card (strict grid)
     let private tableCardRect (screenW: int) (screenH: int) (count: int) (idx: int) =
@@ -257,44 +288,47 @@ module GameScreen =
         let tableCenterX = float32 (tArea.X + tArea.Width / 2)
         let tableCenterY = float32 (tArea.Y + tArea.Height / 2)
         let playerCount = gs.Players.Length
-        let bottomIdx = if gs.Players |> List.exists (fun p -> p.Type = Human) then 0 else gs.CurrentPlayerIndex
+        let bottomIdx = 0   // fixed viewpoint: seat 0 is the bottom seat, also in watch mode
 
-        // Compute destination for each player
+        // Compute destination for each player by seat
         let playerDest (idx: int) =
-            if idx = bottomIdx then
-                // Bottom player — hand area center
+            match seatOf playerCount bottomIdx idx with
+            | SeatBottom ->
                 let handY = float32 (screenH - CardRenderer.scaledHeight() - 20 + CardRenderer.scaledHeight() / 2)
                 (float32 (screenW / 2), handY)
-            else
-                // Top opponent
+            | SeatTop ->
                 let handY = float32 (20 + CardRenderer.scaledHeight() / 2)
                 (float32 (screenW / 2), handY)
+            | seat ->
+                let x, y = sideCardPos screenW screenH seat 4 1
+                (float32 (x + CardRenderer.scaledWidth() / 2), float32 (y + CardRenderer.scaledHeight() / 2))
 
-        let tableStep = { TargetLabel = "table"; CardCount = 4; ToX = tableCenterX; ToY = tableCenterY; IsFaceUp = false }
-
-        // Build player steps: 2 cards per player, repeated twice
-        let playerSteps =
-            [for _ in 1 .. 2 do
-                for pIdx in 0 .. playerCount - 1 do
-                    let (px, py) = playerDest pIdx
-                    { TargetLabel = gs.Players[pIdx].Name; CardCount = 2; ToX = px; ToY = py; IsFaceUp = (pIdx = bottomIdx) }]
-
-        if isFirstDeal then tableStep :: playerSteps
-        else playerSteps
+        // Deal like at a real table: two passes of 2 cards to each player, and
+        // on the first deal each pass ends with 2 cards to the table — so the
+        // table receives its 4 starting cards 2 at a time, after the players.
+        [for _ in 1 .. 2 do
+            for pIdx in 0 .. playerCount - 1 do
+                let (px, py) = playerDest pIdx
+                { TargetLabel = gs.Players[pIdx].Name; CardCount = 2; ToX = px; ToY = py; IsFaceUp = (pIdx = bottomIdx) }
+            if isFirstDeal then
+                { TargetLabel = "table"; CardCount = 2; ToX = tableCenterX; ToY = tableCenterY; IsFaceUp = false }]
 
     /// Build a collect animation from a play result.
     /// Captured cards slide from their table positions to the player's pile area.
     let private buildCollectAnimation
             (playResult: PlayResult)
-            (isBottom: bool)
+            (seat: Seat)
             (screenW: int) (screenH: int)
             (scatteredPos: Map<Card, (int * int * float32)>)
             (tableCards: Card list) (tableCount: int) =
         match playResult with
         | Capture(hc, captured, _) when not (List.isEmpty captured) ->
             let destX, destY =
-                if isBottom then float32 (screenW / 2), float32 (screenH - 10)   // slide off bottom
-                else float32 (screenW / 2), 0.0f                                  // slide off top
+                match seat with
+                | SeatBottom -> float32 (screenW / 2), float32 (screenH - 10)   // slide off bottom
+                | SeatTop    -> float32 (screenW / 2), 0.0f                     // slide off top
+                | SeatLeft   -> 0.0f, float32 (screenH / 2)                     // slide off the left
+                | SeatRight  -> float32 screenW, float32 (screenH / 2)          // slide off the right
             let cards =
                 captured |> List.map (fun card ->
                     match Map.tryFind card scatteredPos with
@@ -402,8 +436,10 @@ module GameScreen =
 
     // ── Initialization ──────────────────────────────────────
 
-    let create (config: GameEngine.GameConfig) (rng: Random) (players: Player list) (roundNumber: int) (scores: Map<string, int>) =
+    let create (config: GameEngine.GameConfig) (rng: Random) (players: Player list) (roundNumber: int) (scores: Map<string, int>) (carry: Scoring.CarryOver) =
         let state = GameEngine.newRound config rng players roundNumber
+        // 10-point freeze: sweeps stop scoring once anyone has 10+ points.
+        let state = { state with SweepsFrozen = scores |> Map.exists (fun _ s -> s >= 10) }
         let state = GameEngine.dealRound state true
         { GameState = { state with DealRound = 1 }
           Config = config
@@ -413,6 +449,7 @@ module GameScreen =
           LastPlayMessage = $"Round {roundNumber} - Deal 1"
           RoundNumber = roundNumber
           CumulativeScores = scores
+          Carry = carry
           Rng = rng
           CardRects = []
           TableCardRects = []
@@ -440,9 +477,16 @@ module GameScreen =
                     LastPlayMessage = $"Round {screen.RoundNumber} - Deal {nextDeal}"
                     Phase = Shuffling 0.0 }
             else
-                // End of round
+                // End of round: the last capturer takes whatever remains on
+                // the table (GameEngine.endRound) — say so, since the cards
+                // leave the table without a play animation.
                 let finalGs = GameEngine.endRound gs
-                { screen with GameState = finalGs; Phase = RoundOver }
+                let message =
+                    match gs.LastCapturer, gs.Table with
+                    | Some idx, (_ :: _ as rest) ->
+                        $"{gs.Players[idx].Name} takes the rest of the table ({List.length rest} cards)"
+                    | _ -> screen.LastPlayMessage
+                { screen with GameState = finalGs; LastPlayMessage = message; Phase = RoundOver }
         else
             // Next player's turn
             let currentPlayer = gs.Players[gs.CurrentPlayerIndex]
@@ -475,7 +519,7 @@ module GameScreen =
             | None -> handCardRect screenW screenH player.Hand.Length cardIndex true
         // Build collect animation from pre-play table positions
         let collectAnim =
-            buildCollectAnimation turnResult.PlayResult true screenW screenH
+            buildCollectAnimation turnResult.PlayResult SeatBottom screenW screenH
                 screen.ScatteredPositions gs.Table (List.length gs.Table)
         // Compute animation target: scatter position for Place, table center for Capture
         let toX, toY, newScattered =
@@ -507,6 +551,10 @@ module GameScreen =
             GameState = turnResult.NewState
             LastPlayMessage = msg
             SelectedCardIndex = None
+            // Clear the capture-preview tint: it is only recomputed while
+            // WaitingForHuman, so a stale set would keep un-picked capture
+            // candidates highlighted through the play animation and beyond.
+            CapturePreview = NoCapture
             ScatteredPositions = newScattered
             Phase = AnimatingPlay(0.0, turnResult.Evaluation, Some cardAnim, collectAnim) }
 
@@ -758,8 +806,11 @@ module GameScreen =
                 let player = gs.Players[gs.CurrentPlayerIndex]
                 let style = GameEngine.computerStyle screen.Config gs.CurrentPlayerIndex
                 let turnResult = GameEngine.playComputerTurnStyled style gs
+                // The viewpoint is fixed (seat 0 at the bottom, also in watch
+                // mode), so each player's animations anchor to its own seat.
+                let seat = seatOf gs.Players.Length 0 gs.CurrentPlayerIndex
                 let collectAnim =
-                    buildCollectAnimation turnResult.PlayResult false screenW screenH
+                    buildCollectAnimation turnResult.PlayResult seat screenW screenH
                         screen.ScatteredPositions gs.Table (List.length gs.Table)
                 // Compute animation target: scatter position for Place, table center for Capture
                 let toX, toY, newScattered =
@@ -788,10 +839,17 @@ module GameScreen =
                     if not (List.isEmpty player.Hand) then
                         let oppHandSize = List.length player.Hand
                         let cardIdx = player.Hand |> List.tryFindIndex ((=) playedCard) |> Option.defaultValue 0
-                        let fromRect = handCardRect screenW screenH oppHandSize cardIdx false
+                        let fromX, fromY =
+                            match seat with
+                            | SeatLeft | SeatRight ->
+                                let x, y = sideCardPos screenW screenH seat oppHandSize cardIdx
+                                (float32 x, float32 y)
+                            | seatTB ->
+                                let r = handCardRect screenW screenH oppHandSize cardIdx (seatTB = SeatBottom)
+                                (float32 r.X, float32 r.Y)
                         Some { Card = playedCard
-                               FromX = float32 fromRect.X
-                               FromY = float32 fromRect.Y
+                               FromX = fromX
+                               FromY = fromY
                                ToX = toX; ToY = toY
                                Duration = cardSlideDuration
                                Highlight = false }
@@ -868,12 +926,32 @@ module GameScreen =
         let cw = CardRenderer.scaledWidth()
         let ch = CardRenderer.scaledHeight()
 
+        // ── Progressive deal reveal ─────────────────────
+        // The game state is fully dealt before the animation plays, so while
+        // Phase = Dealing only the cards whose 2-card batch has already landed
+        // are drawn; the rest pop in as their deal step completes.
+        let dealVisible (label: string) (fullCount: int) =
+            match screen.Phase with
+            | Shuffling _ ->
+                // The state is already dealt during the shuffle, but nothing
+                // has visibly left the deck yet: hide the new hand cards (and,
+                // on the round's first deal, the new table cards) so they don't
+                // flash before the deal animation delivers them.
+                if label = "table" && gs.DealRound > 1 then fullCount else 0
+            | Dealing(step, _, steps) ->
+                let countFor stepsSubset =
+                    stepsSubset
+                    |> List.filter (fun (s: DealStep) -> s.TargetLabel = label)
+                    |> List.sumBy (fun s -> s.CardCount)
+                fullCount - countFor steps + countFor (List.truncate step steps)
+            | _ -> fullCount
+
         // ── Draw table background ───────────────────────
         let tArea = tableArea screenW screenH
         sb.Draw(textures.TableBg, tArea, Color.White)
 
         // ── Draw table cards (with capture preview overlays) ──
-        let tableCount = List.length gs.Table
+        let tableCount = dealVisible "table" (List.length gs.Table)
         // Premultiplied overlay colors for AlphaBlend
         let greenOverlay  = Color(0, 70, 0, 90)      // definite capture
         let yellowOverlay = Color(70, 70, 0, 90)      // possible capture (choice needed)
@@ -917,47 +995,48 @@ module GameScreen =
                     let r = tableCardRect screenW screenH tableCount i
                     CardRenderer.drawCard sb textures card r.X r.Y
 
-        // ── Draw opponent hands (top, face-down) ────────
-        let bottomIdx = if screen.Config.HumanCount > 0 then 0 else gs.CurrentPlayerIndex
-        let opponents =
-            gs.Players
-            |> List.mapi (fun i p -> (i, p))
-            |> List.filter (fun (i, _) -> i <> bottomIdx)
-
-        // Top opponent
-        match opponents with
-        | (_, opp) :: _ ->
-            let oppHandSize = List.length opp.Hand
-            for i in 0 .. oppHandSize - 1 do
-                let r = handCardRect screenW screenH oppHandSize i false
-                if opp.Type = Computer then
-                    CardRenderer.drawCardBack sb textures r.X r.Y
-                else
-                    CardRenderer.drawCard sb textures opp.Hand[i] r.X r.Y
-            drawPlayerLabel sb font opp 20 (ch + 30) Color.LightSalmon
-        | _ -> ()
-
-        // Side opponents (3-4 player games)
-        if opponents.Length >= 2 then
-            let (_, opp2) = opponents[1]
-            let sideY = screenH / 2 - (List.length opp2.Hand * (ch + 4)) / 2
-            for i in 0 .. List.length opp2.Hand - 1 do
-                CardRenderer.drawCardBack sb textures 10 (sideY + i * (ch / 3))
-            sb.DrawString(font, opp2.Name, Vector2(10.0f, float32 (sideY - 20)), Color.LightBlue) |> ignore
-
-        if opponents.Length >= 3 then
-            let (_, opp3) = opponents[2]
-            let sideY = screenH / 2 - (List.length opp3.Hand * (ch + 4)) / 2
-            let sideX = screenW - cw - 10
-            for i in 0 .. List.length opp3.Hand - 1 do
-                CardRenderer.drawCardBack sb textures sideX (sideY + i * (ch / 3))
-            sb.DrawString(font, opp3.Name, Vector2(float32 sideX, float32 (sideY - 20)), Color.Plum) |> ignore
+        // ── Draw opponent hands by clockwise seat ───────
+        // The viewpoint is fixed: seat 0 sits at the bottom even in watch
+        // mode, so seats never rotate mid-game. A spectated (watch-mode) game
+        // has nothing to hide, so CPU hands are then drawn face-up.
+        let bottomIdx = 0
+        let watchMode = screen.Config.HumanCount = 0
+        let playerCount = gs.Players.Length
+        for (i, opp) in gs.Players |> List.mapi (fun i p -> (i, p)) do
+            match seatOf playerCount bottomIdx i with
+            | SeatBottom -> ()   // the face-up hand, drawn below
+            | SeatTop ->
+                let oppHandSize = dealVisible opp.Name (List.length opp.Hand)
+                for ci in 0 .. oppHandSize - 1 do
+                    let r = handCardRect screenW screenH oppHandSize ci false
+                    if opp.Type = Computer && not watchMode then
+                        CardRenderer.drawCardBack sb textures r.X r.Y
+                    else
+                        CardRenderer.drawCard sb textures opp.Hand[ci] r.X r.Y
+                drawPlayerLabel sb font opp 20 (ch + 30) Color.LightSalmon
+            | SeatLeft ->
+                let n = dealVisible opp.Name (List.length opp.Hand)
+                for ci in 0 .. n - 1 do
+                    let x, y = sideCardPos screenW screenH SeatLeft n ci
+                    if watchMode then CardRenderer.drawCard sb textures opp.Hand[ci] x y
+                    else CardRenderer.drawCardBack sb textures x y
+                let labelY = screenH / 2 - (n * (ch + 4)) / 2 - 20
+                sb.DrawString(font, opp.Name, Vector2(10.0f, float32 labelY), Color.LightBlue) |> ignore
+            | SeatRight ->
+                let n = dealVisible opp.Name (List.length opp.Hand)
+                let sideX = screenW - cw - 10
+                for ci in 0 .. n - 1 do
+                    let x, y = sideCardPos screenW screenH SeatRight n ci
+                    if watchMode then CardRenderer.drawCard sb textures opp.Hand[ci] x y
+                    else CardRenderer.drawCardBack sb textures x y
+                let labelY = screenH / 2 - (n * (ch + 4)) / 2 - 20
+                sb.DrawString(font, opp.Name, Vector2(float32 sideX, float32 labelY), Color.Plum) |> ignore
 
         // ── Draw human hand (bottom, face-up) ───────────
         if screen.Config.HumanCount > 0 then
             let humanIdx = 0
             let human = gs.Players[humanIdx]
-            let handSize = List.length human.Hand
+            let handSize = dealVisible human.Name (List.length human.Hand)
             let isDraggingIdx = match screen.DragState with Dragging(idx, _, _) -> Some idx | _ -> None
             for i in 0 .. handSize - 1 do
                 // Skip drawing card at its normal position if being dragged
@@ -997,10 +1076,9 @@ module GameScreen =
                     Button.draw sb font input (placeInsteadButton screenW screenH)
             | _ -> ()
         else
-            // AI-only: show current player's hand face-up
-            let curIdx = gs.CurrentPlayerIndex
-            let curPlayer = gs.Players[curIdx]
-            let handSize = List.length curPlayer.Hand
+            // Watch mode: seat 0 occupies the bottom, face-up like the rest
+            let curPlayer = gs.Players[bottomIdx]
+            let handSize = dealVisible curPlayer.Name (List.length curPlayer.Hand)
             for i in 0 .. handSize - 1 do
                 let r = handCardRect screenW screenH handSize i true
                 CardRenderer.drawCard sb textures curPlayer.Hand[i] r.X r.Y
@@ -1092,7 +1170,7 @@ module GameScreen =
             let centerY = screenH / 2
             let numCards = 6
             let halfN = numCards / 2
-            let tex = textures.Back
+            let tex = textures.HandBack
             let origin = Vector2(float32 tex.Width / 2.0f, float32 tex.Height / 2.0f)
             // Riffle: two halves start separated, slide together, interleave
             let separation = 100.0f  // max pixel distance between halves
@@ -1134,7 +1212,7 @@ module GameScreen =
             let deckY = float32 (tArea.Y + tArea.Height / 2)
             let t = float32 (elapsed / dealStepDuration)
             let eased = 1.0f - (1.0f - t) * (1.0f - t)  // ease-out
-            let tex = textures.Back
+            let tex = textures.HandBack
             let origin = Vector2(float32 tex.Width / 2.0f, float32 tex.Height / 2.0f)
             for ci in 0 .. currentStep.CardCount - 1 do
                 // Slight horizontal spread at destination

@@ -55,7 +55,7 @@ let private updateScreen (input: Input.InputState) (dt: float) =
             rng <- Random()
             let players = GameEngine.createPlayers config
             let scores = players |> List.map (fun p -> p.Name, 0) |> Map.ofList
-            let gameScreen = GameScreen.create config rng players 1 scores
+            let gameScreen = GameScreen.create config rng players 1 scores Scoring.CarryOver.zero
             textures |> Option.iter (applyCardBack config)
             screen <- Playing gameScreen
         | MenuScreen.ShowOptions ->
@@ -98,6 +98,7 @@ let private updateScreen (input: Input.InputState) (dt: float) =
                         newGameState.Config.Variant
                         newGameState.RoundNumber
                         newGameState.Config.TargetScore
+                        newGameState.Carry
                 screen <- Scores scoreScreen
             | _ -> screen <- Playing newGameState
 
@@ -120,7 +121,7 @@ let private updateScreen (input: Input.InputState) (dt: float) =
                       Settings = settings }
                 let players = newScoreState.Scores |> List.map fst
                 let nextRound = newScoreState.RoundNumber + 1
-                let gameScreen = GameScreen.create config rng players nextRound newScoreState.CumulativeScores
+                let gameScreen = GameScreen.create config rng players nextRound newScoreState.CumulativeScores newScoreState.CarryOut
                 // Keep the same card back for every round of this game; the
                 // back is randomized only when a new game starts (from menu).
                 screen <- Playing gameScreen

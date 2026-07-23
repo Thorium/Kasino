@@ -21,6 +21,8 @@ module ScoreScreen =
     type ScoreState =
         { Scores: (Player * Scoring.ScoreBreakdown) list
           CumulativeScores: Map<string, int>
+          /// Most-cards/most-spades pot left undistributed by ties this round.
+          CarryOut: Scoring.CarryOver
           Phase: ScorePhase
           Variant: GameVariant
           RoundNumber: int
@@ -41,8 +43,9 @@ module ScoreScreen =
         (variant: GameVariant)
         (roundNumber: int)
         (targetScore: int)
+        (carry: Scoring.CarryOver)
         =
-        let scores = Scoring.calculateScores players
+        let scores, carryOut = Scoring.calculateScoresCarry carry players
         let newCumulative =
             scores
             |> List.fold (fun acc (p, s) ->
@@ -56,6 +59,7 @@ module ScoreScreen =
 
         { Scores = scores
           CumulativeScores = newCumulative
+          CarryOut = carryOut
           Phase = if gameOver then GameOver else RoundSummary
           Variant = variant
           RoundNumber = roundNumber

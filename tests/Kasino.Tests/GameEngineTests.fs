@@ -51,7 +51,7 @@ let ``allHandsEmpty should return true when all hands empty`` () =
     let state: GameEngine.GameState =
         { Players = players; Table = []; Deck = []
           CurrentPlayerIndex = 0; DealRound = 1; TotalDeals = 6
-          LastCapturer = None; Variant = StandardKasino }
+          LastCapturer = None; Variant = StandardKasino; SweepsFrozen = false }
     Assert.True(GameEngine.allHandsEmpty state)
 
 [<Fact>]
@@ -64,7 +64,7 @@ let ``allHandsEmpty should return false when any hand has cards`` () =
     let state: GameEngine.GameState =
         { Players = players; Table = []; Deck = []
           CurrentPlayerIndex = 0; DealRound = 1; TotalDeals = 6
-          LastCapturer = None; Variant = StandardKasino }
+          LastCapturer = None; Variant = StandardKasino; SweepsFrozen = false }
     Assert.False(GameEngine.allHandsEmpty state)
 
 [<Fact>]
@@ -126,7 +126,7 @@ let ``endRound should give remaining table cards to last capturer`` () =
     let state: GameEngine.GameState =
         { Players = players; Table = table; Deck = []
           CurrentPlayerIndex = 0; DealRound = 6; TotalDeals = 6
-          LastCapturer = Some 0; Variant = StandardKasino }
+          LastCapturer = Some 0; Variant = StandardKasino; SweepsFrozen = false }
     let final = GameEngine.endRound state
     Assert.Equal(3, final.Players[0].CapturedCards.Length)
     Assert.Empty(final.Table)
@@ -140,7 +140,7 @@ let ``endRound with no last capturer should leave table unchanged`` () =
     let state: GameEngine.GameState =
         { Players = players; Table = table; Deck = []
           CurrentPlayerIndex = 0; DealRound = 6; TotalDeals = 6
-          LastCapturer = None; Variant = StandardKasino }
+          LastCapturer = None; Variant = StandardKasino; SweepsFrozen = false }
     let final = GameEngine.endRound state
     Assert.Equal(1, final.Table.Length)
 
