@@ -52,8 +52,9 @@ module CardRenderer =
     /// All card textures keyed by (Suit, Rank).
     type CardTextures =
         { Cards: Map<Suit * Rank, Texture2D>
-          mutable Back: Texture2D   // currently active card back
-          Backs: Texture2D[]        // available card-back designs
+          mutable Back: Texture2D   // currently active deck image (one of Backs)
+          HandBack: Texture2D       // single card back for face-down hand cards
+          Backs: Texture2D[]        // available deck designs (scenic, stacked edges)
           TableBg: Texture2D }      // green felt
 
     let createColorTexture (device: GraphicsDevice) (color: Color) =
@@ -162,7 +163,9 @@ module CardRenderer =
             if File.Exists(tableBgPath) then loadTexture device tableBgPath
             else generateFeltTexture device
 
-        { Cards = cardMap; Back = backs[0]; Backs = backs; TableBg = tableBg }
+        // The scenic backN images are deck-pile art (stacked edges baked in);
+        // face-down cards in hands always use the plain single-card back.
+        { Cards = cardMap; Back = backs[0]; HandBack = defaultBack; Backs = backs; TableBg = tableBg }
 
     /// Pick a random card back for the next game (mutates the active Back).
     let pickRandomBack (rng: Random) (textures: CardTextures) =
@@ -172,15 +175,16 @@ module CardRenderer =
     let getTexture (textures: CardTextures) (card: Card) =
         match Map.tryFind (card.Suit, card.Rank) textures.Cards with
         | Some tex -> tex
-        | None     -> textures.Back
+        | None     -> textures.HandBack
 
     // ── Card drawing (into a render buffer at a given layer) ──
 
     let drawCard buffer (layer: int<RenderLayer>) textures card x y =
         Render.sprite buffer layer (getTexture textures card) (Rectangle(x, y, scaledWidth(), scaledHeight()))
 
+    /// Draw a face-down card (single card back, not the deck image).
     let drawCardBack buffer (layer: int<RenderLayer>) (textures: CardTextures) x y =
-        Render.sprite buffer layer textures.Back (Rectangle(x, y, scaledWidth(), scaledHeight()))
+        Render.sprite buffer layer textures.HandBack (Rectangle(x, y, scaledWidth(), scaledHeight()))
 
     /// Card with a colored border behind it (selection / hover).
     let drawCardHighlighted buffer (layer: int<RenderLayer>) textures card x y (borderColor: Color) =

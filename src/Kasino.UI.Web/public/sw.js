@@ -1,6 +1,6 @@
-// Simple PWA service worker: network-first with cache fallback, so new
+﻿// Simple PWA service worker: network-first with cache fallback, so new
 // deployments show up immediately but the game still opens offline.
-const CACHE = 'kasino-v1';
+const CACHE = 'kasino-v2';
 const PRECACHE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (e) => {

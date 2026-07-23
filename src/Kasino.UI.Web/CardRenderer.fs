@@ -46,8 +46,9 @@ module CardRenderer =
 
     type CardTextures =
         { Cards: Dictionary<string, HTMLImageElement>
-          mutable Back: HTMLImageElement  // currently active card back (one of Backs)
-          Backs: HTMLImageElement[]       // available card-back designs (scenic photos)
+          mutable Back: HTMLImageElement  // currently active deck image (one of Backs)
+          HandBack: HTMLImageElement      // single card back for face-down hand cards
+          Backs: HTMLImageElement[]       // available deck designs (scenic, stacked edges)
           TableBg: HTMLImageElement }
 
     /// Vite's configured base URL (always ends in "/").
@@ -95,9 +96,12 @@ module CardRenderer =
                     match loadedBacks with
                     | [] -> [| images["back.png"] |]
                     | xs -> List.toArray xs
+                // The scenic backN images are deck-pile art (stacked edges
+                // baked in); face-down hand cards always use the plain back.
                 onReady
                     { Cards = cards
                       Back = backs[0]
+                      HandBack = images["back.png"]
                       Backs = backs
                       TableBg = images["table_bg.png"] }
 
@@ -116,15 +120,15 @@ module CardRenderer =
     let getTexture (textures: CardTextures) (card: Card) =
         match textures.Cards.TryGetValue(cardFilename card) with
         | true, img -> img
-        | _ -> textures.Back
+        | _ -> textures.HandBack
 
     /// Draw a card at a position.
     let drawCard (g: Gfx) (textures: CardTextures) (card: Card) (x: int) (y: int) =
         Gfx.drawImage g (getTexture textures card) x y (scaledWidth ()) (scaledHeight ())
 
-    /// Draw a face-down card.
+    /// Draw a face-down card (single card back, not the deck image).
     let drawCardBack (g: Gfx) (textures: CardTextures) (x: int) (y: int) =
-        Gfx.drawImage g textures.Back x y (scaledWidth ()) (scaledHeight ())
+        Gfx.drawImage g textures.HandBack x y (scaledWidth ()) (scaledHeight ())
 
     /// Draw a card with a highlight border (for selection / hover).
     let drawCardHighlighted (g: Gfx) (textures: CardTextures) (card: Card) (x: int) (y: int) (borderColor: Color) =

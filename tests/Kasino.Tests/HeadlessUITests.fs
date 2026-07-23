@@ -306,7 +306,7 @@ let private mkMultiCaptureScreen () =
           Settings = settings }
     let human = { Name = "You"; Type = Human; Hand = []; CapturedCards = []; Sweeps = 0 }
     let cpu = { Name = "CPU"; Type = Computer; Hand = []; CapturedCards = []; Sweeps = 0 }
-    let screen = GameScreen.create config (Random 1) [ human; cpu ] 1 (Map.ofList [ "You", 0; "CPU", 0 ])
+    let screen = GameScreen.create config (Random 1) [ human; cpu ] 1 (Map.ofList [ "You", 0; "CPU", 0 ]) Scoring.CarryOver.zero
     let gs =
         { screen.GameState with
             Players =

@@ -111,7 +111,7 @@ module Game =
                 let rng = Random()
                 let players = GameEngine.createPlayers config
                 let scores = players |> List.map (fun p -> p.Name, 0) |> Map.ofList
-                let gameScreen = GameScreen.create config rng players 1 scores
+                let gameScreen = GameScreen.create config rng players 1 scores Scoring.CarryOver.zero
                 model.Textures |> Option.iter (applyCardBack rng config)
                 { model with Screen = Playing gameScreen; Rng = rng }
             | MenuScreen.ShowOptions ->
@@ -153,6 +153,7 @@ module Game =
                             newGameState.Config.Variant
                             newGameState.RoundNumber
                             newGameState.Config.TargetScore
+                            newGameState.Carry
                     { model with Screen = Scores scoreScreen }
                 | _ ->
                     { model with Screen = Playing newGameState }
@@ -177,7 +178,7 @@ module Game =
                           Settings = model.Settings }
                     let players = newScoreState.Scores |> List.map fst
                     let nextRound = newScoreState.RoundNumber + 1
-                    let gameScreen = GameScreen.create config model.Rng players nextRound newScoreState.CumulativeScores
+                    let gameScreen = GameScreen.create config model.Rng players nextRound newScoreState.CumulativeScores newScoreState.CarryOut
                     { model with Screen = Playing gameScreen }
             else
                 { model with Screen = Scores newScoreState }
