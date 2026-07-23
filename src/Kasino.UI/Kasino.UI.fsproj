@@ -4,7 +4,17 @@
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>Kasino.UI</RootNamespace>
     <PublishReadyToRun>false</PublishReadyToRun>
+    <!-- Kasino app icon (four aces, same art as the web PWA icons). -->
+    <ApplicationIcon>Icon.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- MonoGame's SDL platform looks up the embedded "Icon.bmp" at startup
+         and uses it as the window/taskbar icon; LogicalName keeps the manifest
+         name it expects. -->
+    <EmbeddedResource Include="Icon.ico" LogicalName="Icon.ico" />
+    <EmbeddedResource Include="Icon.bmp" LogicalName="Icon.bmp" />
+  </ItemGroup>
 
   <ItemGroup>
     <Compile Include="CardRenderer.fs" />

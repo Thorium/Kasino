@@ -70,7 +70,7 @@ module MenuScreen =
             | Some 0 -> { state with Variant = StandardKasino; Step = PlayerCountSelect }
             | Some 1 -> { state with Variant = LaistoKasino;   Step = PlayerCountSelect }
             | _ ->
-                match input.Keyboard.NumberPressed with
+                match Input.picked input with
                 | Some 1 -> { state with Variant = StandardKasino; Step = PlayerCountSelect }
                 | Some 2 -> { state with Variant = LaistoKasino;   Step = PlayerCountSelect }
                 | _ -> state
@@ -81,7 +81,7 @@ module MenuScreen =
             | Some 1 -> { state with PlayerCount = 3; Step = HumanCountSelect }
             | Some 2 -> { state with PlayerCount = 4; Step = HumanCountSelect }
             | _ ->
-                match input.Keyboard.NumberPressed with
+                match Input.picked input with
                 | Some n when n >= 2 && n <= 4 ->
                     { state with PlayerCount = n; Step = HumanCountSelect }
                 | _ -> state
@@ -91,7 +91,7 @@ module MenuScreen =
             | Some 0 -> { state with HumanCount = 0; Step = Ready }
             | Some 1 -> { state with HumanCount = 1; Step = Ready }
             | _ ->
-                match input.Keyboard.NumberPressed with
+                match Input.picked input with
                 | Some 0 -> { state with HumanCount = 0; Step = Ready }
                 | Some 1 -> { state with HumanCount = 1; Step = Ready }
                 | _ -> state

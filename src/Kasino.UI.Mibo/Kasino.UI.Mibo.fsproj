@@ -20,10 +20,20 @@
     <PublishReadyToRun>false</PublishReadyToRun>
     <!-- The content-pipeline build task infers the platform from this. -->
     <MonoGamePlatform>DesktopGL</MonoGamePlatform>
-    <!-- Use our explicit FSharp.Core (10.1.301, required by Mibo) instead of
+    <!-- Kasino app icon (four aces, same art as the web PWA icons). -->
+    <ApplicationIcon>Icon.ico</ApplicationIcon>
+    <!-- Use our explicit FSharp.Core (10.1.302, required by Mibo) instead of
          the SDK's implicit 10.0.100, which would otherwise win the downgrade. -->
     <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- MonoGame's SDL platform looks up the embedded "Icon.bmp" at startup
+         and uses it as the window/taskbar icon; LogicalName keeps the manifest
+         name it expects. -->
+    <EmbeddedResource Include="Icon.ico" LogicalName="Icon.ico" />
+    <EmbeddedResource Include="Icon.bmp" LogicalName="Icon.bmp" />
+  </ItemGroup>
 
   <ItemGroup>
     <Compile Include="Render.fs" />
@@ -40,12 +50,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Mibo.MonoGame requires FSharp.Core >= 10.1.301; pin it so it isn't
+    <!-- Mibo.MonoGame requires FSharp.Core >= 10.1.302; pin it so it isn't
          downgraded to the SDK default (which fails to bind at runtime). -->
-    <PackageReference Include="FSharp.Core" Version="10.1.301" />
-    <PackageReference Include="Mibo.MonoGame" Version="2.1.0" />
-    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.4.1" />
-    <PackageReference Include="MonoGame.Content.Builder.Task" Version="3.8.4.1" />
+    <PackageReference Include="FSharp.Core" Version="10.1.302" />
+    <PackageReference Include="Mibo.MonoGame" Version="3.1.1" />
+    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.5" />
+    <PackageReference Include="MonoGame.Content.Builder.Task" Version="3.8.5" />
   </ItemGroup>
 
   <ItemGroup>

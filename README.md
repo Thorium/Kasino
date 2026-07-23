@@ -78,8 +78,16 @@ dotnet test
 [Mibo](https://angelmunoz.github.io/Mibo/) game framework — an Elmish/MVU F#
 framework over MonoGame. It targets the same DesktopGL (OpenGL) backend as
 `Kasino.UI`, reuses `Kasino.Domain` unchanged, and re-expresses the whole UI as
-a functional Model-View-Update program (a top-level screen model + per-screen
-`update`/`view`, mouse/keyboard delivered as subscriptions).
+a functional Model-View-Update program: a top-level screen model with per-screen
+`update`/`view`, drawing through Mibo's fluent DSL on sorted render layers,
+keyboard bound to semantic actions via `InputMap`, and mouse delivered as a
+subscription.
+
+The same Elmish program also runs under Mibo's headless runtime — no window,
+graphics, or SDL — which `tests/Kasino.Tests/HeadlessUITests.fs` uses to drive
+menu flows, overlays, options, human card play (selection, the capture-option
+modal, place-instead), and complete AI games through to game over, all with
+virtual time and injected input messages.
 
 Fonts use the MonoGame content pipeline (a compiled `SpriteFont`, built from the
 bundled DejaVu Sans in `Content/fonts/`), since Mibo's `Draw.text` renders

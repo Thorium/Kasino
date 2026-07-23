@@ -35,7 +35,7 @@ module OptionsScreen =
 
     // ── Update ──
     let update (input: Input.InputState) (screenW: int) (screenH: int) (state: OptionsState) =
-        if Button.isClicked input (backButton screenH) || input.Keyboard.IsEscapePressed then
+        if Button.isClicked input (backButton screenH) || Input.has Input.Back input then
             { state with BackClicked = true }
         else
             let s = state.Settings

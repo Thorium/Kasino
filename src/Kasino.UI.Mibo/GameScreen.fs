@@ -469,7 +469,7 @@ module GameScreen =
         let escapeToMenu =
             match screen.Phase with
             | WaitingForHuman | ChoosingCaptureOption _ -> false
-            | _ -> input.Keyboard.IsEscapePressed
+            | _ -> Input.has Input.Back input
 
         if not inCaptureModal && Button.isClicked input (helpButton screenW) then
             { screen with ShowRulesClicked = true }
@@ -550,17 +550,17 @@ module GameScreen =
 
             match screen.DragState with
             | NotDragging ->
-                if input.Keyboard.IsEscapePressed then
+                if Input.has Input.Back input then
                     if screen.SelectedCardIndex.IsSome then
                         { screen with SelectedCardIndex = None; CapturePreview = NoCapture }
                     else
                         { screen with MenuClicked = true }
-                elif input.Keyboard.IsEnterPressed then
+                elif Input.has Input.Continue input then
                     match screen.SelectedCardIndex with
                     | Some idx -> processHumanPlay screen idx screenW screenH
                     | None -> screen
                 else
-                match input.Keyboard.NumberPressed with
+                match Input.picked input with
                 | Some n when n >= 1 && n <= player.Hand.Length ->
                     let idx = n - 1
                     if screen.SelectedCardIndex = Some idx then
@@ -710,17 +710,17 @@ module GameScreen =
                     { screen with Phase = ChoosingCaptureOption(cardIdx, options, modal.NextPage) }
                 elif (match modal.PlaceButton with Some b -> Button.isClicked input b | None -> false) then
                     processHumanPlace screen cardIdx screenW screenH
-                elif Button.isClicked input modal.CancelButton || input.Keyboard.IsEscapePressed then
+                elif Button.isClicked input modal.CancelButton || Input.has Input.Back input then
                     { screen with Phase = WaitingForHuman; SelectedCardIndex = None }
                 else
-                    match input.Keyboard.NumberPressed with
+                    match Input.picked input with
                     | Some n when n >= 1 && n <= modal.VisibleCount ->
                         processCapture screen cardIdx options[modal.PageStart + n - 1] screenW screenH
                     | _ -> screen
 
         | RoundOver ->
             let btn = continueButton screenW screenH
-            if Button.isClicked input btn || input.Keyboard.IsEnterPressed then
+            if Button.isClicked input btn || Input.has Input.Continue input then
                 { screen with ContinueClicked = true }
             else
                 screen

@@ -57,7 +57,7 @@ module ScoreScreen =
 
     let update (input: Input.InputState) (screenW: int) (screenH: int) (state: ScoreState) =
         let btn = actionButton screenW screenH state.Phase
-        if Button.isClicked input btn || input.Keyboard.IsEnterPressed then
+        if Button.isClicked input btn || Input.has Input.Continue input then
             { state with ContinueClicked = true }
         else
             state

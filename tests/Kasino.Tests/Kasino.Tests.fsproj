@@ -2,6 +2,8 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <IsPackable>false</IsPackable>
+    <!-- Use the explicit FSharp.Core below (Mibo requires >= 10.1.302). -->
+    <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
   </PropertyGroup>
 
   <ItemGroup>
@@ -11,9 +13,12 @@
     <Compile Include="ScoringTests.fs" />
     <Compile Include="AITests.fs" />
     <Compile Include="GameEngineTests.fs" />
+    <Compile Include="HeadlessUITests.fs" />
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Match the Kasino.UI.Mibo pin (Mibo requires >= 10.1.302). -->
+    <PackageReference Include="FSharp.Core" Version="10.1.302" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
     <PackageReference Include="xunit" Version="2.*" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.*" />
@@ -21,5 +26,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Kasino.Domain\Kasino.Domain.fsproj" />
+    <!-- Headless UI tests drive the Mibo Elmish program with no window. -->
+    <ProjectReference Include="..\..\src\Kasino.UI.Mibo\Kasino.UI.Mibo.fsproj" />
   </ItemGroup>
 </Project>

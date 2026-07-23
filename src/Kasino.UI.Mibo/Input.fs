@@ -6,15 +6,47 @@ open Mibo.Input
 // ─────────────────────────────────────────────────────────────
 // Input.
 //
-// The MonoGame build polled Mouse/Keyboard.GetState() every Update and
-// edge-detected against the previous frame. Mibo is push-based: it delivers
-// input as per-frame subscription messages. So we accumulate raw input into a
-// RawInput value and, on each Tick, project the exact same InputState the
-// screens expect and then clear the one-frame edges. This keeps every screen's
-// `update` logic identical to the MonoGame version.
+// Keyboard goes through Mibo's InputMap: physical keys are bound to semantic
+// UI actions once, and InputMapper.subscribeStatic delivers ActionState
+// messages whose Started set already carries the edge detection the old
+// MonoGame build (and the first cut of this port) did by hand against the
+// previous frame's keyboard state.
+//
+// The mouse stays on the Mouse.listen delta subscription because the screens
+// hit-test against the pointer position; deltas accumulate into RawInput and
+// each Tick projects the InputState the screens consume, then clears the
+// one-frame edges.
 // ─────────────────────────────────────────────────────────────
 
 module Input =
+
+    /// Semantic UI actions; every key is bound in [uiMap] below.
+    type UiAction =
+        | Continue          // confirm / advance (Enter)
+        | Back              // back / cancel / quit from the menu (Escape)
+        | PrevPage          // rules paging (Left)
+        | NextPage          // rules paging (Right)
+        | ToggleFullscreen  // F11
+        | Pick of int       // menu / capture-modal option N (digit row + numpad)
+
+    /// The one InputMap for the whole app. Screens are modal (menu, game,
+    /// rules, ...) so a single static map with per-screen interpretation of
+    /// the small action set is enough — no per-screen rebinding.
+    let uiMap : InputMap<UiAction> =
+        let digitKeys =
+            [ 0, KeyCode.D0; 1, KeyCode.D1; 2, KeyCode.D2; 3, KeyCode.D3; 4, KeyCode.D4
+              5, KeyCode.D5; 6, KeyCode.D6; 7, KeyCode.D7; 8, KeyCode.D8; 9, KeyCode.D9
+              0, KeyCode.Kp0; 1, KeyCode.Kp1; 2, KeyCode.Kp2; 3, KeyCode.Kp3; 4, KeyCode.Kp4
+              5, KeyCode.Kp5; 6, KeyCode.Kp6; 7, KeyCode.Kp7; 8, KeyCode.Kp8; 9, KeyCode.Kp9 ]
+        let baseMap =
+            InputMap.empty
+            |> InputMap.key Continue KeyCode.Enter
+            |> InputMap.key Back KeyCode.Escape
+            |> InputMap.key PrevPage KeyCode.Left
+            |> InputMap.key NextPage KeyCode.Right
+            |> InputMap.key ToggleFullscreen KeyCode.F11
+        (baseMap, digitKeys)
+        ||> List.fold (fun m (n, k) -> m |> InputMap.key (Pick n) k)
 
     type MouseState =
         { Position: Point
@@ -22,17 +54,17 @@ module Input =
           LeftJustClicked: bool
           RightJustClicked: bool }
 
-    type KeyboardState =
-        { IsEscapePressed: bool
-          IsEnterPressed: bool
-          IsLeftPressed: bool
-          IsRightPressed: bool
-          IsF11Pressed: bool
-          NumberPressed: int option }
-
     type InputState =
         { Mouse: MouseState
-          Keyboard: KeyboardState }
+          /// Actions whose key was pressed since the last Tick.
+          Actions: Set<UiAction> }
+
+    /// Did this action start this frame?
+    let has (a: UiAction) (i: InputState) = i.Actions.Contains a
+
+    /// The option number picked this frame, if any (0-9).
+    let picked (i: InputState) : int option =
+        i.Actions |> Seq.tryPick (function Pick n -> Some n | _ -> None)
 
     /// Raw input accumulated between ticks.
     type RawInput =
@@ -41,18 +73,16 @@ module Input =
           LeftHeld: bool
           LeftClicked: bool          // a left-button press edge since last tick
           RightClicked: bool
-          PressedKeys: KeyCode list } // key-down edges since last tick (newest first)
+          Started: Set<UiAction> }   // action edges since last tick
 
     let emptyRaw =
         { MouseX = 0; MouseY = 0
           LeftHeld = false; LeftClicked = false; RightClicked = false
-          PressedKeys = [] }
+          Started = Set.empty }
 
     let defaultState : InputState =
         { Mouse = { Position = Point.Zero; LeftPressed = false; LeftJustClicked = false; RightJustClicked = false }
-          Keyboard =
-            { IsEscapePressed = false; IsEnterPressed = false; IsLeftPressed = false
-              IsRightPressed = false; IsF11Pressed = false; NumberPressed = None } }
+          Actions = Set.empty }
 
     /// Fold a mouse delta (position + button press/release edges) into RawInput.
     let applyMouse (d: MouseDelta) (r: RawInput) : RawInput =
@@ -64,44 +94,23 @@ module Input =
             if b = MouseButtonCode.Left then r2 <- { r2 with LeftHeld = false }
         r2
 
-    /// Fold a key-down edge into RawInput.
-    let applyKeyDown (k: KeyCode) (r: RawInput) : RawInput =
-        { r with PressedKeys = k :: r.PressedKeys }
-
-    let private numberOf (k: KeyCode) =
-        if   k = KeyCode.D0 || k = KeyCode.Kp0 then Some 0
-        elif k = KeyCode.D1 || k = KeyCode.Kp1 then Some 1
-        elif k = KeyCode.D2 || k = KeyCode.Kp2 then Some 2
-        elif k = KeyCode.D3 || k = KeyCode.Kp3 then Some 3
-        elif k = KeyCode.D4 || k = KeyCode.Kp4 then Some 4
-        elif k = KeyCode.D5 || k = KeyCode.Kp5 then Some 5
-        elif k = KeyCode.D6 || k = KeyCode.Kp6 then Some 6
-        elif k = KeyCode.D7 || k = KeyCode.Kp7 then Some 7
-        elif k = KeyCode.D8 || k = KeyCode.Kp8 then Some 8
-        elif k = KeyCode.D9 || k = KeyCode.Kp9 then Some 9
-        else None
+    /// Fold an InputMapper delta into RawInput. Only Started matters here:
+    /// the UI acts on press edges, never on held keys.
+    let applyActions (s: ActionState<UiAction>) (r: RawInput) : RawInput =
+        { r with Started = Set.union r.Started s.Started }
 
     /// Project accumulated raw input into the per-frame InputState screens consume.
     let project (r: RawInput) : InputState =
-        let has k = List.contains k r.PressedKeys
-        // Oldest-first so the first number key pressed this frame wins.
-        let numberPressed = r.PressedKeys |> List.rev |> List.tryPick numberOf
         { Mouse =
             { Position = Point(r.MouseX, r.MouseY)
               LeftPressed = r.LeftHeld
               LeftJustClicked = r.LeftClicked
               RightJustClicked = r.RightClicked }
-          Keyboard =
-            { IsEscapePressed = has KeyCode.Escape
-              IsEnterPressed = has KeyCode.Enter
-              IsLeftPressed = has KeyCode.Left
-              IsRightPressed = has KeyCode.Right
-              IsF11Pressed = has KeyCode.F11
-              NumberPressed = numberPressed } }
+          Actions = r.Started }
 
     /// Drop per-frame edges after a Tick consumed them (held state persists).
     let clearEdges (r: RawInput) : RawInput =
-        { r with LeftClicked = false; RightClicked = false; PressedKeys = [] }
+        { r with LeftClicked = false; RightClicked = false; Started = Set.empty }
 
     // ── Hit testing (used by screens) ──
     let hitTest (rect: Rectangle) (point: Point) = rect.Contains(point)

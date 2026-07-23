@@ -5,6 +5,7 @@ open System.IO
 open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Graphics
 open Mibo.Elmish
+open Mibo.Elmish.Graphics
 open Mibo.Elmish.Graphics2D
 open Mibo.Input
 open Kasino.Domain
@@ -49,7 +50,7 @@ module Game =
     type Msg =
         | Tick of GameTime
         | MouseEvent of MouseDelta
-        | KeyDown of KeyCode
+        | ActionsChanged of ActionState<Input.UiAction>
 
     /// Choose the card back for a new game: random scenic back if enabled,
     /// otherwise a fixed back so it stays constant.
@@ -68,20 +69,29 @@ module Game =
                 if Directory.Exists src then src else d
 
     // ── Init ──
+
+    /// Fresh starting model with no graphics resources attached. The update
+    /// loop only touches Textures/Font through Option, so this model is also
+    /// the complete headless starting state.
+    let private freshModel () =
+        { Screen = Menu MenuScreen.initial
+          Settings = Settings.defaultSettings
+          Rng = Random()
+          Textures = None
+          Font = None
+          Input = Input.emptyRaw }
+
     let init (ctx: GameContext) : struct (Model * Cmd<Msg>) =
         let device = MonoGameGameContext.getGraphicsDevice ctx
         let textures = CardRenderer.loadAll device (findContentDir ())
         CardRenderer.Scale <- float32 WindowH / 768.0f
         let assets = GameContext.getService<IAssets> ctx
         let font = assets.Font("fonts/UI")
-        let model =
-            { Screen = Menu MenuScreen.initial
-              Settings = Settings.defaultSettings
-              Rng = Random()
-              Textures = Some textures
-              Font = Some font
-              Input = Input.emptyRaw }
-        struct (model, Cmd.none)
+        struct ({ freshModel () with Textures = Some textures; Font = Some font }, Cmd.none)
+
+    /// Init for the headless runtime: no window, no graphics services.
+    let initHeadless (_ctx: GameContext) : struct (Model * Cmd<Msg>) =
+        struct (freshModel (), Cmd.none)
 
     // ── Screen transitions (mirrors KasinoGame.Update) ──
     let private stepScreens (model: Model) (input: Input.InputState) (dt: float) : Model =
@@ -188,39 +198,35 @@ module Game =
     let update (msg: Msg) (model: Model) : struct (Model * Cmd<Msg>) =
         match msg with
         | MouseEvent d -> struct ({ model with Input = Input.applyMouse d model.Input }, Cmd.none)
-        | KeyDown k -> struct ({ model with Input = Input.applyKeyDown k model.Input }, Cmd.none)
+        | ActionsChanged s -> struct ({ model with Input = Input.applyActions s model.Input }, Cmd.none)
         | Tick gt ->
             let dt = gt.ElapsedGameTime.TotalSeconds
             let input = Input.project model.Input
             let screenAtStart = model.Screen
             let model2 = stepScreens model input dt
             // F11 toggles fullscreen (safe to ApplyChanges during Update).
-            if input.Keyboard.IsF11Pressed && not (obj.ReferenceEquals(graphicsManager, null)) then
+            if Input.has Input.ToggleFullscreen input && not (obj.ReferenceEquals(graphicsManager, null)) then
                 graphicsManager.IsFullScreen <- not graphicsManager.IsFullScreen
                 graphicsManager.ApplyChanges()
-            // Escape quits only when we began the frame already on the menu (so
+            // Back quits only when we began the frame already on the menu (so
             // an Escape that closed an overlay back to the menu doesn't also quit).
             let quit =
                 match screenAtStart with
-                | Menu _ when input.Keyboard.IsEscapePressed -> true
+                | Menu _ when Input.has Input.Back input -> true
                 | _ -> false
             let model3 = { model2 with Input = Input.clearEdges model2.Input }
             let cmd = if quit then Cmd.signalExit else Cmd.none
             struct (model3, cmd)
 
     // ── View ──
-    let view (ctx: GameContext) (model: Model) (buffer: RenderBuffer2D) =
+    let view (_ctx: GameContext) (model: Model) (buffer: RenderBuffer2D) =
         let w, h = WindowW, WindowH
-        // Mibo draws textured sprites through a PrimitiveBatch that never sets a
-        // sampler, so card art samples with the GraphicsDevice default (linear
-        // wrap) — rotated (scatter) cards then bleed a grey fringe at their
-        // edges. Force point sampling on the device for the sprite path; card
-        // sprites (low layers) flush before the first text SpriteBatch, which
-        // resets the sampler to linear for smooth downscaled text.
-        let gd = MonoGameGameContext.getGraphicsDevice ctx
-        gd.SamplerStates[0] <- SamplerState.PointClamp
-        // Dark green background behind everything (the felt table draws its own).
-        Render.fill buffer 0<RenderLayer> (Color(25, 50, 35)) (Rectangle(0, 0, w, h))
+        // Since Mibo 3.x sprites go through a SpriteBatch whose sampler the
+        // renderer tracks per batch (default LinearClamp), so the 2.x-era
+        // device-level PointClamp poke is both dead and unnecessary: the grey
+        // fringe on rotated (scatter) cards came from the device default being
+        // linear *wrap*, and clamp sampling never wraps.
+        // The dark green background is the renderer's ClearColor (see create).
 
         match model.Font with
         | Some font ->
@@ -240,7 +246,7 @@ module Game =
     let subscribe (ctx: GameContext) (_model: Model) : Sub<Msg> =
         Sub.batch2(
             Mouse.listen MouseEvent ctx,
-            Keyboard.onPressed KeyDown ctx)
+            InputMapper.subscribeStatic Input.uiMap ActionsChanged ctx)
 
     // ── Program composition ──
     let create () : MonoGameProgram<Model, Msg> =
@@ -251,8 +257,19 @@ module Game =
         |> Program.withInput
         |> Program.withSubscription subscribe
         |> Program.withTick Tick
-        |> Program.withRenderer (fun () -> Renderer2D.create view)
+        // The renderer's clear doubles as the dark-green backdrop behind the
+        // felt table (the default config would clear to black and the view
+        // would then have to paint the backdrop again itself).
+        |> Program.withRenderer (fun () ->
+            Renderer2D.createWith { ClearColor = ValueSome (Color(25, 50, 35)) } view)
         |> MonoGameProgram.ofProgram
         |> MonoGameProgram.withConfig (fun (game, deviceManager) ->
             game.Content.RootDirectory <- "Content"
             graphicsManager <- deviceManager)
+
+    /// The same Elmish loop with no renderer, window, or input services — for
+    /// tests and server-side simulation (Mibo headless mode). Input is injected
+    /// by dispatching MouseEvent / ActionsChanged messages into the runner.
+    let createHeadless () : HeadlessProgram<Model, Msg> =
+        HeadlessProgram.mkHeadless initHeadless update
+        |> HeadlessProgram.withTick Tick

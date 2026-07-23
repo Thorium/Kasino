@@ -237,15 +237,15 @@ module RulesScreen =
     // ── Update ──
     let update (input: Input.InputState) (screenW: int) (screenH: int) (state: RulesState) =
         let back = backButton screenW screenH
-        if Button.isClicked input back || input.Keyboard.IsEscapePressed then
+        if Button.isClicked input back || Input.has Input.Back input then
             { state with BackClicked = true }
         else
             let page = state.CurrentPage
             let page =
                 if page > 0 && Button.isClicked input (prevButton screenW screenH) then page - 1
                 elif page < totalPages - 1 && Button.isClicked input (nextButton screenW screenH) then page + 1
-                elif input.Keyboard.IsLeftPressed && page > 0 then page - 1
-                elif input.Keyboard.IsRightPressed && page < totalPages - 1 then page + 1
+                elif Input.has Input.PrevPage input && page > 0 then page - 1
+                elif Input.has Input.NextPage input && page < totalPages - 1 then page + 1
                 else page
             { state with CurrentPage = page }
 
