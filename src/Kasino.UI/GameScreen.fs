@@ -167,20 +167,29 @@ module GameScreen =
         let y = screenH / 2 - (handSize * (ch + 4)) / 2 + i * (ch / 3)
         (x, y)
 
-    /// Get the bounding rectangle for a table card (strict grid)
+    /// Get the bounding rectangle for a table card (strict grid).
+    /// Up to 7 cards sit in one row; more split into balanced rows (9 = 5+4),
+    /// each row individually centered.
     let private tableCardRect (screenW: int) (screenH: int) (count: int) (idx: int) =
-        let cols = min count 10
-        let rows = (count + cols - 1) / cols
-        let totalW = cols * (CardRenderer.scaledWidth() + tableCardGap) - tableCardGap
-        let totalH = rows * (CardRenderer.scaledHeight() + tableCardGap) - tableCardGap
-        let baseX = (screenW - totalW) / 2
-        let baseY = (screenH - totalH) / 2
-        let col = idx % cols
+        let rows = if count <= 7 then 1 else (count + 6) / 7
+        let cols = (count + rows - 1) / rows
         let row = idx / cols
+        let col = idx % cols
+        let rowCount = min cols (count - row * cols)   // last row may be short
+        let rowW = rowCount * (CardRenderer.scaledWidth() + tableCardGap) - tableCardGap
+        let totalH = rows * (CardRenderer.scaledHeight() + tableCardGap) - tableCardGap
+        let baseX = (screenW - rowW) / 2
+        let baseY = (screenH - totalH) / 2
         Rectangle(
             baseX + col * (CardRenderer.scaledWidth() + tableCardGap),
             baseY + row * (CardRenderer.scaledHeight() + tableCardGap),
             CardRenderer.scaledWidth(), CardRenderer.scaledHeight())
+
+    /// Display order for the strict grid: cards arranged by table value
+    /// (aces first, kings last), suits keeping ties stable. The game state's
+    /// own order is untouched — this is presentation only.
+    let private gridOrder (table: Card list) =
+        table |> List.sortBy (fun c -> Cards.tableValue c.Rank, c.Suit)
 
     /// Get the table area rectangle.
     /// Horizontal margins leave room for potential side-opponent hands (3-4 player games).
@@ -303,11 +312,13 @@ module GameScreen =
                 let x, y = sideCardPos screenW screenH seat 4 1
                 (float32 (x + CardRenderer.scaledWidth() / 2), float32 (y + CardRenderer.scaledHeight() / 2))
 
-        // Deal like at a real table: two passes of 2 cards to each player, and
-        // on the first deal each pass ends with 2 cards to the table — so the
-        // table receives its 4 starting cards 2 at a time, after the players.
+        // Deal like at a real table: two passes of 2 cards to each player —
+        // starting with the player next to the dealer (the wave's first to
+        // act, CurrentPlayerIndex) and proceeding clockwise, dealer last —
+        // and on the first deal each pass ends with 2 cards to the table.
         [for _ in 1 .. 2 do
-            for pIdx in 0 .. playerCount - 1 do
+            for k in 0 .. playerCount - 1 do
+                let pIdx = (gs.CurrentPlayerIndex + k) % playerCount
                 let (px, py) = playerDest pIdx
                 { TargetLabel = gs.Players[pIdx].Name; CardCount = 2; ToX = px; ToY = py; IsFaceUp = (pIdx = bottomIdx) }
             if isFirstDeal then
@@ -334,8 +345,8 @@ module GameScreen =
                     match Map.tryFind card scatteredPos with
                     | Some(x, y, _) -> (card, float32 x, float32 y)
                     | None ->
-                        // Fallback: use grid position
-                        let idx = tableCards |> List.tryFindIndex ((=) card) |> Option.defaultValue 0
+                        // Fallback: use grid position (value-sorted display order)
+                        let idx = gridOrder tableCards |> List.tryFindIndex ((=) card) |> Option.defaultValue 0
                         let r = tableCardRect screenW screenH tableCount idx
                         (card, float32 (r.X + r.Width / 2), float32 (r.Y + r.Height / 2)))
             // The played card is banked with the capture: after its slide
@@ -351,14 +362,15 @@ module GameScreen =
 
     // ── Button helpers ──────────────────────────────────────
 
-    /// "Play Card" button — text and color change based on capture preview
-    let private playButton (screenW: int) (screenH: int) (preview: CapturePreview) =
+    /// "Play Card" button — text and color change based on capture preview.
+    /// Strict rules hide how many cards the capture would take.
+    let private playButton (screenW: int) (screenH: int) (strict: bool) (preview: CapturePreview) =
         let label, color =
             match preview with
             | NoCapture ->
                 "Place on Table", Color(100, 100, 100)
             | SingleCapture cards ->
-                $"Capture {cards.Length} Cards", Color(40, 140, 40)
+                (if strict then "Capture Cards" else $"Capture {cards.Length} Cards"), Color(40, 140, 40)
             | MultipleCaptures _ ->
                 "Play (Choose Capture)", Color(160, 160, 40)
         Button.createCentered label screenW (screenH - CardRenderer.scaledHeight() - 80) 240 52 color Color.White
@@ -386,18 +398,32 @@ module GameScreen =
     let private placeInsteadButton (screenW: int) (screenH: int) =
         Button.create "Place Instead" (screenW / 2 + 130) (screenH - CardRenderer.scaledHeight() - 80) 170 52 (Color(100, 100, 100)) Color.White
 
+    /// Suit tint for card names rendered as text: red suits reddish, black
+    /// suits gray, so the card lists read at a glance against white text.
+    let private cardTextColor (c: Card) =
+        match c.Suit with
+        | Hearts | Diamonds -> Color(255, 135, 125)
+        | _ -> Color(190, 190, 190)
+
+    /// Label segments for a capture-option button: white prefix/suffix with
+    /// each card name tinted by its suit.
+    let private captureOptionSegments (num: int) (captured: Card list) =
+        [ yield ($"{num}: ", Color.White)
+          for c in captured do yield (Cards.display c + " ", cardTextColor c)
+          yield ($"({captured.Length} cards)", Color.White) ]
+
     /// The capture-choice modal, paginated so it always fits on screen
     /// (findCaptureOptions can return up to 64 options).
     type private CaptureModal =
         { OptionButtons: (int * Button.ButtonDef) list   // absolute option index * button
           MoreButton: Button.ButtonDef option            // cycles to the next page
           PlaceButton: Button.ButtonDef option           // Standard only: decline the capture
-          CancelButton: Button.ButtonDef
+          CancelButton: Button.ButtonDef option          // absent under strict rules
           PageStart: int
           VisibleCount: int
           NextPage: int }
 
-    let private captureModal (variant: GameVariant) (options: Rules.CaptureOption list) (page: int) (screenW: int) (screenH: int) : CaptureModal =
+    let private captureModal (variant: GameVariant) (strict: bool) (options: Rules.CaptureOption list) (page: int) (screenW: int) (screenH: int) : CaptureModal =
         let perPage = max 3 ((screenH - 240) / 56)
         let pageCount = (options.Length + perPage - 1) / perPage
         let page = ((page % pageCount) + pageCount) % pageCount
@@ -424,8 +450,10 @@ module GameScreen =
             if allowPlace then
                 Some (Button.createCentered "Place on table instead" screenW placeY 450 48 (Color(100, 100, 100)) Color.White)
             else None
+        // Strict rules: the touched card must be played — no cancelling out.
         let cancelBtn =
-            Button.createCentered "Cancel" screenW (placeY + placeRows * 56 + 8) 180 48 (Color(120, 40, 40)) Color.White
+            if strict then None
+            else Some (Button.createCentered "Cancel" screenW (placeY + placeRows * 56 + 8) 180 48 (Color(120, 40, 40)) Color.White)
         { OptionButtons = optButtons
           MoreButton = moreButton
           PlaceButton = placeButton
@@ -436,10 +464,13 @@ module GameScreen =
 
     // ── Initialization ──────────────────────────────────────
 
-    let create (config: GameEngine.GameConfig) (rng: Random) (players: Player list) (roundNumber: int) (scores: Map<string, int>) (carry: Scoring.CarryOver) =
+    let create (config: GameEngine.GameConfig) (rng: Random) (players: Player list) (roundNumber: int) (scores: Map<string, int>) (carry: Scoring.CarryOver) (startOffset: int) =
         let state = GameEngine.newRound config rng players roundNumber
         // 10-point freeze: sweeps stop scoring once anyone has 10+ points.
         let state = { state with SweepsFrozen = scores |> Map.exists (fun _ s -> s >= 10) }
+        // The dealer is randomized per game: startOffset shifts the engine's
+        // round-by-round starter rotation by a per-game random amount.
+        let state = { state with CurrentPlayerIndex = (state.CurrentPlayerIndex + startOffset) % players.Length }
         let state = GameEngine.dealRound state true
         { GameState = { state with DealRound = 1 }
           Config = config
@@ -740,7 +771,7 @@ module GameScreen =
                         // Instead (Standard: capturing is optional), then nudge a
                         // table card (scatter mode only — the grid never overlaps),
                         // else deselect.
-                        let btn = playButton screenW screenH preview
+                        let btn = playButton screenW screenH screen.Config.Settings.StrictRules preview
                         let canPlaceInstead =
                             gs.Variant = StandardKasino
                             && (match preview with NoCapture -> false | _ -> true)
@@ -884,7 +915,7 @@ module GameScreen =
                 { screen with Phase = AnimatingPlay(newElapsed, eval, cardAnim, collectAnim) }
 
         | ChoosingCaptureOption(cardIdx, options, page) ->
-            let modal = captureModal gs.Variant options page screenW screenH
+            let modal = captureModal gs.Variant screen.Config.Settings.StrictRules options page screenW screenH
             // Touch: check the visible capture option buttons
             let clickedOption =
                 modal.OptionButtons |> List.tryFind (fun (_, b) -> Button.isClicked input b)
@@ -896,7 +927,8 @@ module GameScreen =
                     { screen with Phase = ChoosingCaptureOption(cardIdx, options, modal.NextPage) }
                 elif (match modal.PlaceButton with Some b -> Button.isClicked input b | None -> false) then
                     processHumanPlace screen cardIdx screenW screenH
-                elif Button.isClicked input modal.CancelButton || input.Keyboard.IsEscapePressed then
+                elif (match modal.CancelButton with Some b -> Button.isClicked input b | None -> false)
+                     || (not screen.Config.Settings.StrictRules && input.Keyboard.IsEscapePressed) then
                     { screen with Phase = WaitingForHuman; SelectedCardIndex = None }
                 else
                     // Keyboard fallback: number keys pick from the visible page
@@ -956,6 +988,8 @@ module GameScreen =
         let greenOverlay  = Color(0, 70, 0, 90)      // definite capture
         let yellowOverlay = Color(70, 70, 0, 90)      // possible capture (choice needed)
         let definiteSet, possibleSet =
+            // Strict rules: capture candidates are not pre-highlighted.
+            if screen.Config.Settings.StrictRules then Set.empty, Set.empty else
             match screen.CapturePreview with
             | NoCapture -> Set.empty, Set.empty
             | SingleCapture cards -> Set.ofList cards, Set.empty
@@ -967,8 +1001,15 @@ module GameScreen =
             | AnimatingPlay(elapsed, _, Some anim, _) when elapsed < anim.Duration -> Some anim.Card
             | _ -> None
 
-        for i in 0 .. tableCount - 1 do
-            let card = gs.Table[i]
+        // Grid mode arranges cards by value; scatter positions are per-card.
+        let displayTable =
+            let visible = gs.Table |> List.truncate tableCount
+            match screen.TableLayout with
+            | StrictGrid -> gridOrder visible
+            | RandomScatter -> visible
+
+        for i in 0 .. List.length displayTable - 1 do
+            let card = displayTable[i]
             // Skip drawing this card if it's currently being animated (Place action flicker fix)
             if animatingCard = Some card then () else
             match screen.TableLayout with
@@ -1068,7 +1109,7 @@ module GameScreen =
             // legal (Standard Kasino, card can capture).
             match screen.Phase, screen.SelectedCardIndex, screen.DragState with
             | WaitingForHuman, Some _, NotDragging ->
-                Button.draw sb font input (playButton screenW screenH screen.CapturePreview)
+                Button.draw sb font input (playButton screenW screenH screen.Config.Settings.StrictRules screen.CapturePreview)
                 let canPlaceInstead =
                     gs.Variant = StandardKasino
                     && (match screen.CapturePreview with NoCapture -> false | _ -> true)
@@ -1266,7 +1307,7 @@ module GameScreen =
             let overlayTex = CardRenderer.getCachedColorTexture (sb.GraphicsDevice) (Color(0, 0, 0, 160))
             sb.Draw(overlayTex, Rectangle(0, 0, screenW, screenH), Color.White)
 
-            let modal = captureModal gs.Variant options page screenW screenH
+            let modal = captureModal gs.Variant screen.Config.Settings.StrictRules options page screenW screenH
 
             // Header text
             let headerText = "Choose which cards to capture:"
@@ -1277,11 +1318,14 @@ module GameScreen =
                 | [] -> float32 (screenH / 2 - 80)
             sb.DrawString(font, headerText, Vector2(float32 screenW / 2.0f - headerSize.X / 2.0f, headerY), Color.Gold) |> ignore
 
-            // Option buttons + paging + optional place + cancel
-            Button.drawAll sb font input (modal.OptionButtons |> List.map snd)
+            // Option buttons (card names tinted by suit) + paging + optional
+            // place + cancel
+            for (optIdx, btn) in modal.OptionButtons do
+                let segments = captureOptionSegments (optIdx - modal.PageStart + 1) options[optIdx].Captured
+                Button.drawSegmented sb font input btn segments
             modal.MoreButton |> Option.iter (Button.draw sb font input)
             modal.PlaceButton |> Option.iter (Button.draw sb font input)
-            Button.draw sb font input modal.CancelButton
+            modal.CancelButton |> Option.iter (Button.draw sb font input)
 
         | RoundOver ->
             // Continue button (no overlay needed)

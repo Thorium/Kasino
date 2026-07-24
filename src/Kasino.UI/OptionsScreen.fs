@@ -24,7 +24,7 @@ module OptionsScreen =
     let private toggleColor (on: bool) =
         if on then Color(40, 120, 60) else Color(90, 90, 90)
 
-    /// The four toggle buttons, in display order, with the text reflecting state.
+    /// The toggle buttons, in display order, with the text reflecting state.
     let private toggleButtons (screenW: int) (s: Settings.GameSettings) =
         let onOff b = if b then "ON" else "OFF"
         let y0 = 180
@@ -32,7 +32,8 @@ module OptionsScreen =
         [ Button.createCentered (sprintf "Random card backs:  %s" (onOff s.RandomCardBacks)) screenW y0 420 52 (toggleColor s.RandomCardBacks) Color.White
           Button.createCentered (sprintf "Table layout: %s" (if s.DefaultScatter then "Scatter" else "Grid")) screenW (y0 + dy) 420 52 (Color(60, 70, 110)) Color.White
           Button.createCentered (sprintf "AI table-talk (chat):  %s" (onOff s.ChatEnabled)) screenW (y0 + 2 * dy) 420 52 (toggleColor s.ChatEnabled) Color.White
-          Button.createCentered (sprintf "AI personalities:  %s" (onOff s.AiPersonalities)) screenW (y0 + 3 * dy) 420 52 (toggleColor s.AiPersonalities) Color.White ]
+          Button.createCentered (sprintf "AI personalities:  %s" (onOff s.AiPersonalities)) screenW (y0 + 3 * dy) 420 52 (toggleColor s.AiPersonalities) Color.White
+          Button.createCentered (sprintf "Strict rules (no capture cancel):  %s" (onOff s.StrictRules)) screenW (y0 + 4 * dy) 420 52 (toggleColor s.StrictRules) Color.White ]
 
     let private backButton (screenH: int) =
         Button.create "Back" 20 (screenH - 70) 140 52 (Color(120, 40, 40)) Color.White
@@ -48,6 +49,7 @@ module OptionsScreen =
             | Some 1 -> { state with Settings = { s with DefaultScatter = not s.DefaultScatter } }
             | Some 2 -> { state with Settings = { s with ChatEnabled = not s.ChatEnabled } }
             | Some 3 -> { state with Settings = { s with AiPersonalities = not s.AiPersonalities } }
+            | Some 4 -> { state with Settings = { s with StrictRules = not s.StrictRules } }
             | _ -> state
 
     // ── Draw ────────────────────────────────────────────

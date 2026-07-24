@@ -58,6 +58,20 @@ module Button =
         let ty = float r.Y + (float r.Height - size.Y) / 2.0
         Gfx.fillText g btn.Text tx ty btn.TextColor
 
+    /// Draw a button whose label is a list of (text, color) segments rendered
+    /// as one centered line. Used where parts of the label carry meaning by
+    /// color (e.g. card names tinted by suit in the capture modal).
+    let drawSegmented (g: Gfx) (input: Input.InputState) (btn: ButtonDef) (segments: (string * Color) list) =
+        draw g input { btn with Text = "" }
+        let r = btn.Rect
+        let totalW = segments |> List.sumBy (fun (s, _) -> (Gfx.measure g s).X)
+        let lineH = (Gfx.measure g "Ag").Y
+        let mutable x = float r.X + (float r.Width - totalW) / 2.0
+        let ty = float r.Y + (float r.Height - lineH) / 2.0
+        for (s, c) in segments do
+            Gfx.fillText g s x ty c
+            x <- x + (Gfx.measure g s).X
+
     let drawAll (g: Gfx) (input: Input.InputState) (buttons: ButtonDef list) =
         buttons |> List.iter (draw g input)
 
