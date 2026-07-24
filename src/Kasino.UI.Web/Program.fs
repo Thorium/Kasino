@@ -30,6 +30,9 @@ let mutable screenH = 768
 let mutable private screen: ActiveScreen = Menu MenuScreen.initial
 let mutable private settings = Settings.defaultSettings
 let mutable private rng = Random()
+/// Per-game random dealer shift: the first round's starter (the player next
+/// to the dealer) is drawn at game start instead of always seat 0.
+let mutable private dealerOffset = 0
 let mutable private textures: CardRenderer.CardTextures option = None
 let mutable private lastTime = 0.0
 
@@ -54,8 +57,9 @@ let private updateScreen (input: Input.InputState) (dt: float) =
                   Settings = settings }
             rng <- Random()
             let players = GameEngine.createPlayers config
+            dealerOffset <- rng.Next(players.Length)
             let scores = players |> List.map (fun p -> p.Name, 0) |> Map.ofList
-            let gameScreen = GameScreen.create config rng players 1 scores Scoring.CarryOver.zero
+            let gameScreen = GameScreen.create config rng players 1 scores Scoring.CarryOver.zero dealerOffset
             textures |> Option.iter (applyCardBack config)
             screen <- Playing gameScreen
         | MenuScreen.ShowOptions ->
@@ -121,7 +125,7 @@ let private updateScreen (input: Input.InputState) (dt: float) =
                       Settings = settings }
                 let players = newScoreState.Scores |> List.map fst
                 let nextRound = newScoreState.RoundNumber + 1
-                let gameScreen = GameScreen.create config rng players nextRound newScoreState.CumulativeScores newScoreState.CarryOut
+                let gameScreen = GameScreen.create config rng players nextRound newScoreState.CumulativeScores newScoreState.CarryOut dealerOffset
                 // Keep the same card back for every round of this game; the
                 // back is randomized only when a new game starts (from menu).
                 screen <- Playing gameScreen

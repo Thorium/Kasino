@@ -76,6 +76,20 @@ module Button =
         let ty = float32 r.Y + (float32 r.Height - size.Y) / 2.0f
         sb.DrawString(font, btn.Text, Vector2(tx, ty), btn.TextColor) |> ignore
 
+    /// Draw a button whose label is a list of (text, color) segments rendered
+    /// as one centered line. Used where parts of the label carry meaning by
+    /// color (e.g. card names tinted by suit in the capture modal).
+    let drawSegmented (sb: SpriteBatch) (font: SpriteFontBase) (input: InputHandler.InputState) (btn: ButtonDef) (segments: (string * Color) list) =
+        draw sb font input { btn with Text = "" }
+        let r = btn.Rect
+        let totalW = segments |> List.sumBy (fun (s, _) -> (font.MeasureString s).X)
+        let lineH = (font.MeasureString "Ag").Y
+        let mutable x = float32 r.X + (float32 r.Width - totalW) / 2.0f
+        let ty = float32 r.Y + (float32 r.Height - lineH) / 2.0f
+        for (s, c) in segments do
+            sb.DrawString(font, s, Vector2(x, ty), c) |> ignore
+            x <- x + (font.MeasureString s).X
+
     /// Draw a list of buttons
     let drawAll (sb: SpriteBatch) (font: SpriteFontBase) (input: InputHandler.InputState) (buttons: ButtonDef list) =
         buttons |> List.iter (draw sb font input)

@@ -27,7 +27,13 @@ Capture cards from the table by playing a card from your hand whose value matche
 | 2 of Spades | 1 |
 | Each Sweep | 1 |
 
-Ties award no points in that category.
+Scoring fine print:
+
+- **Tied categories carry over.** When players tie for most cards or most spades, nobody scores it that round — the points join a pot that rolls into the next round, collected by whoever then wins the category outright.
+- **Sweeps cancel out.** The lowest sweep count at the table is subtracted from every player's sweeps; only the surplus scores.
+- **Sweep freeze.** Once any player has reached 10 cumulative points, sweeps score nothing for the rest of the game.
+- **Round end.** The last player to capture takes any cards left on the table — this does not count as a sweep.
+- The first player to reach 16 cumulative points wins.
 
 ## Controls
 
