@@ -43,6 +43,9 @@ module Game =
         { Screen: ActiveScreen
           Settings: Settings.GameSettings
           Rng: Random
+          /// Per-game random dealer shift: the first round's starter (the
+          /// player next to the dealer) is drawn at game start, not seat 0.
+          DealerOffset: int
           Textures: CardRenderer.CardTextures option
           Font: SpriteFont option
           Input: Input.RawInput }
@@ -77,6 +80,7 @@ module Game =
         { Screen = Menu MenuScreen.initial
           Settings = Settings.defaultSettings
           Rng = Random()
+          DealerOffset = 0
           Textures = None
           Font = None
           Input = Input.emptyRaw }
@@ -110,10 +114,11 @@ module Game =
                       Settings = model.Settings }
                 let rng = Random()
                 let players = GameEngine.createPlayers config
+                let dealerOffset = rng.Next(players.Length)
                 let scores = players |> List.map (fun p -> p.Name, 0) |> Map.ofList
-                let gameScreen = GameScreen.create config rng players 1 scores Scoring.CarryOver.zero
+                let gameScreen = GameScreen.create config rng players 1 scores Scoring.CarryOver.zero dealerOffset
                 model.Textures |> Option.iter (applyCardBack rng config)
-                { model with Screen = Playing gameScreen; Rng = rng }
+                { model with Screen = Playing gameScreen; Rng = rng; DealerOffset = dealerOffset }
             | MenuScreen.ShowOptions ->
                 let prevStep =
                     match menuState.Step with
@@ -178,7 +183,7 @@ module Game =
                           Settings = model.Settings }
                     let players = newScoreState.Scores |> List.map fst
                     let nextRound = newScoreState.RoundNumber + 1
-                    let gameScreen = GameScreen.create config model.Rng players nextRound newScoreState.CumulativeScores newScoreState.CarryOut
+                    let gameScreen = GameScreen.create config model.Rng players nextRound newScoreState.CumulativeScores newScoreState.CarryOut model.DealerOffset
                     { model with Screen = Playing gameScreen }
             else
                 { model with Screen = Scores newScoreState }

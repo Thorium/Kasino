@@ -306,7 +306,7 @@ let private mkMultiCaptureScreen () =
           Settings = settings }
     let human = { Name = "You"; Type = Human; Hand = []; CapturedCards = []; Sweeps = 0 }
     let cpu = { Name = "CPU"; Type = Computer; Hand = []; CapturedCards = []; Sweeps = 0 }
-    let screen = GameScreen.create config (Random 1) [ human; cpu ] 1 (Map.ofList [ "You", 0; "CPU", 0 ]) Scoring.CarryOver.zero
+    let screen = GameScreen.create config (Random 1) [ human; cpu ] 1 (Map.ofList [ "You", 0; "CPU", 0 ]) Scoring.CarryOver.zero 0
     let gs =
         { screen.GameState with
             Players =
@@ -361,3 +361,25 @@ let ``standard kasino allows placing a capturable card with the place-instead bu
     Assert.Empty human.Hand
     Assert.Empty human.CapturedCards
     Assert.Equal(5, s2.GameState.Table.Length)   // the four table cards + the placed 10♠
+
+[<Fact>]
+let ``strict rules keep the capture modal open on escape`` () =
+    let step actions screen = GameScreen.update (mkInput actions) 0.016 1024 768 screen
+    let strictScreen =
+        let s = mkMultiCaptureScreen ()
+        { s with Config = { s.Config with Settings = { s.Config.Settings with StrictRules = true } } }
+    let s1 = strictScreen |> step [ Input.Pick 1 ] |> step [ Input.Continue ]
+    (match s1.Phase with
+     | GameScreen.ChoosingCaptureOption _ -> ()
+     | other -> failwith $"expected the capture modal, got %A{other}")
+    // Escape must NOT close the modal under strict rules — the touched card
+    // has to be played.
+    let s2 = s1 |> step [ Input.Back ]
+    (match s2.Phase with
+     | GameScreen.ChoosingCaptureOption _ -> ()
+     | other -> failwith $"strict rules must keep the modal open, got %A{other}")
+    // Picking an option still resolves the play.
+    let s3 = s2 |> step [ Input.Pick 1 ]
+    (match s3.Phase with
+     | GameScreen.AnimatingPlay _ -> ()
+     | other -> failwith $"expected AnimatingPlay, got %A{other}")

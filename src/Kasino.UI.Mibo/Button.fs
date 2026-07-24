@@ -62,6 +62,19 @@ module Button =
         let ty = float32 btn.Rect.Y + (float32 btn.Rect.Height - size.Y) / 2.0f
         Render.text buffer (baseLayer + 2<RenderLayer>) font btn.Text (Vector2(tx, ty)) btn.TextColor
 
+    /// Draw a button whose label is a list of (text, color) segments rendered
+    /// as one centered line. Used where parts of the label carry meaning by
+    /// color (e.g. card names tinted by suit in the capture modal).
+    let drawSegmentedAt (buffer: RenderBuffer2D) (baseLayer: int<RenderLayer>) (font: SpriteFont) (input: Input.InputState) (btn: ButtonDef) (segments: (string * Color) list) =
+        drawAt buffer baseLayer font input { btn with Text = "" }
+        let totalW = segments |> List.sumBy (fun (s, _) -> (Render.measure font s).X)
+        let lineH = (Render.measure font "Ag").Y
+        let mutable x = float32 btn.Rect.X + (float32 btn.Rect.Width - totalW) / 2.0f
+        let ty = float32 btn.Rect.Y + (float32 btn.Rect.Height - lineH) / 2.0f
+        for (s, c) in segments do
+            Render.text buffer (baseLayer + 2<RenderLayer>) font s (Vector2(x, ty)) c
+            x <- x + (Render.measure font s).X
+
     let draw buffer font input btn = drawAt buffer Render.LButton font input btn
     let drawAll buffer font input (buttons: ButtonDef list) = buttons |> List.iter (draw buffer font input)
     let drawAllAt buffer baseLayer font input (buttons: ButtonDef list) =
