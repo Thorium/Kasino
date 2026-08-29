@@ -333,7 +333,7 @@ module GameScreen =
             match preview with
             | NoCapture -> "Place on Table", Color.rgb 100 100 100
             | SingleCapture cards ->
-                (if strict then "Capture Cards" else sprintf "Capture %d Cards" cards.Length), Color.rgb 40 140 40
+                (if strict then "Capture Cards" else $"Capture %d{cards.Length} Cards"), Color.rgb 40 140 40
             | MultipleCaptures _ -> "Play (Choose Capture)", Color.rgb 160 160 40
         Button.createCentered label screenW (screenH - CardRenderer.scaledHeight () - 80) 240 52 color Color.White
 
@@ -360,14 +360,14 @@ module GameScreen =
     let private cardTextColor (c: Card) =
         match c.Suit with
         | Hearts | Diamonds -> Color.rgb 255 135 125
-        | _ -> Color.rgb 190 190 190
+        | Spades | Clubs -> Color.rgb 190 190 190
 
     /// Label segments for a capture-option button: white prefix/suffix with
     /// each card name tinted by its suit.
     let private captureOptionSegments (num: int) (captured: Card list) =
-        [ yield (sprintf "%d: " num, Color.White)
+        [ yield ($"%d{num}: ", Color.White)
           for c in captured do yield (Cards.display c + " ", cardTextColor c)
-          yield (sprintf "(%d cards)" captured.Length, Color.White) ]
+          yield ($"(%d{captured.Length} cards)", Color.White) ]
 
     /// The capture-choice modal, paginated so it always fits on screen
     /// (findCaptureOptions can return up to 64 options).
@@ -433,7 +433,7 @@ module GameScreen =
           Phase = Shuffling 0.0
           SelectedCardIndex = None
           HoveredCardIndex = None
-          LastPlayMessage = sprintf "Round %d - Deal 1" roundNumber
+          LastPlayMessage = $"Round %d{roundNumber} - Deal 1"
           RoundNumber = roundNumber
           CumulativeScores = scores
           Carry = carry
@@ -458,7 +458,7 @@ module GameScreen =
                 let newGs = GameEngine.dealRound gs false
                 { screen with
                     GameState = { newGs with DealRound = nextDeal }
-                    LastPlayMessage = sprintf "Round %d - Deal %d" screen.RoundNumber nextDeal
+                    LastPlayMessage = $"Round %d{screen.RoundNumber} - Deal %d{nextDeal}"
                     Phase = Shuffling 0.0 }
             else
                 // End of round: the last capturer takes whatever remains on
@@ -705,7 +705,7 @@ module GameScreen =
                         let btn = playButton screenW screenH screen.Config.Settings.StrictRules preview
                         let canPlaceInstead =
                             gs.Variant = StandardKasino
-                            && (match preview with NoCapture -> false | _ -> true)
+                            && (match preview with NoCapture -> false | SingleCapture _ | MultipleCaptures _ -> true)
                         if screen.SelectedCardIndex.IsSome && Button.isClicked input btn then
                             processHumanPlay screen screen.SelectedCardIndex.Value screenW screenH
                         elif screen.SelectedCardIndex.IsSome && canPlaceInstead
@@ -996,7 +996,7 @@ module GameScreen =
             let humanIdx = 0
             let human = gs.Players[humanIdx]
             let handSize = dealVisible human.Name (List.length human.Hand)
-            let isDraggingIdx = match screen.DragState with Dragging(idx, _, _) -> Some idx | _ -> None
+            let isDraggingIdx = match screen.DragState with Dragging(idx, _, _) -> Some idx | NotDragging | DraggingTable _ -> None
             for i in 0 .. handSize - 1 do
                 if isDraggingIdx = Some i then () else
                 let r = handCardRect screenW screenH handSize i true
@@ -1028,7 +1028,7 @@ module GameScreen =
                 Button.draw g input (playButton screenW screenH screen.Config.Settings.StrictRules screen.CapturePreview)
                 let canPlaceInstead =
                     gs.Variant = StandardKasino
-                    && (match screen.CapturePreview with NoCapture -> false | _ -> true)
+                    && (match screen.CapturePreview with NoCapture -> false | SingleCapture _ | MultipleCaptures _ -> true)
                 if canPlaceInstead then
                     Button.draw g input (placeInsteadButton screenW screenH)
             | _ -> ()
@@ -1057,7 +1057,7 @@ module GameScreen =
                 | NotDragging ->
                     match screen.CapturePreview with
                     | NoCapture -> "Place on table. [Enter] play  [Esc] cancel"
-                    | SingleCapture cards -> sprintf "Capture %d cards. [Enter] play  [Esc] cancel" cards.Length
+                    | SingleCapture cards -> $"Capture %d{cards.Length} cards. [Enter] play  [Esc] cancel"
                     | MultipleCaptures _ -> "Multiple options. [Enter] choose  [Esc] cancel"
             | WaitingForHuman -> "Select a card ([1]-[4] or click)  [Esc] menu"
             | ComputerThinking _ -> sprintf "%s thinking..." gs.Players[gs.CurrentPlayerIndex].Name
@@ -1089,11 +1089,11 @@ module GameScreen =
         gs.Players
         |> List.iteri (fun i p ->
             let cumScore = screen.CumulativeScores |> Map.tryFind p.Name |> Option.defaultValue 0
-            Gfx.fillText g (sprintf "%s: %d" p.Name cumScore) (float scoreX) (float (scoreStartY + 24 + i * 22)) Color.White)
+            Gfx.fillText g ($"%s{p.Name}: %d{cumScore}") (float scoreX) (float (scoreStartY + 24 + i * 22)) Color.White)
 
         let infoY = scoreStartY + 24 + gs.Players.Length * 22 + 8
         let deckCount = List.length gs.Deck
-        Gfx.fillText g (sprintf "R%d Deal %d/%d" screen.RoundNumber gs.DealRound gs.TotalDeals) (float scoreX) (float infoY) Color.LightGray
+        Gfx.fillText g ($"R%d{screen.RoundNumber} Deal %d{gs.DealRound}/%d{gs.TotalDeals}") (float scoreX) (float infoY) Color.LightGray
         let deckIconW = cw / 2
         let deckIconH = ch / 2
         let deckIconX = scoreX

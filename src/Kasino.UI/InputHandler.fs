@@ -84,7 +84,7 @@ module InputHandler =
 
     /// Check if a point is inside a rectangle
     let hitTest (rect: Rectangle) (point: Point) =
-        rect.Contains(point)
+        rect.Contains point
 
     /// Find which card rectangle (if any) was clicked
     let findClickedCard (rects: (int * Rectangle) list) (point: Point) =

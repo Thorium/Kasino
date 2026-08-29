@@ -59,7 +59,7 @@ module CardRenderer =
 
     let createColorTexture (device: GraphicsDevice) (color: Color) =
         let tex = new Texture2D(device, 1, 1)
-        tex.SetData([| color |])
+        tex.SetData [| color |]
         tex
 
     /// Procedural card back (Balatro-inspired diamond lattice) — fallback when
@@ -82,8 +82,8 @@ module CardRenderer =
         let patternColor2 = Color(140, 50, 50)
         let dotColor = Color(200, 160, 60)
         for x in 5 .. w - 6 do
+            let dx = (x - 5) % 8
             for y in 5 .. h - 6 do
-                let dx = (x - 5) % 8
                 let dy = (y - 5) % 8
                 let dist = abs(dx - 4) + abs(dy - 4)
                 if dist = 3 then pixels[y * w + x] <- patternColor1
@@ -98,7 +98,7 @@ module CardRenderer =
                     if dist <= 6 && dist >= 4 then pixels[y * w + x] <- Color(220, 180, 70)
                     elif dist < 4 then pixels[y * w + x] <- Color(160, 40, 40)
         let tex = new Texture2D(device, w, h)
-        tex.SetData(pixels)
+        tex.SetData pixels
         tex
 
     /// Procedural poker-green felt — fallback when no table_bg.png ships.
@@ -123,7 +123,7 @@ module CardRenderer =
                 let b = max 0 (min 255 (baseB + total / 2))
                 pixels[y * w + x] <- Color(r, g, b)
         let tex = new Texture2D(device, w, h)
-        tex.SetData(pixels)
+        tex.SetData pixels
         tex
 
     /// Load all card textures from a Content/cards directory. Also installs the
@@ -145,7 +145,7 @@ module CardRenderer =
         let scenicBacks =
             [ 1 .. 9 ]
             |> List.choose (fun i ->
-                let p = Path.Combine(cardsDir, sprintf "back%d.png" i)
+                let p = Path.Combine(cardsDir, $"back%d{i}.png")
                 if File.Exists(p) then Some(loadTexture device p) else None)
 
         let defaultBack =

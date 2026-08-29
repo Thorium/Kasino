@@ -113,7 +113,7 @@ module Input =
         { r with LeftClicked = false; RightClicked = false; Started = Set.empty }
 
     // ── Hit testing (used by screens) ──
-    let hitTest (rect: Rectangle) (point: Point) = rect.Contains(point)
+    let hitTest (rect: Rectangle) (point: Point) = rect.Contains point
 
     let findClickedCard (rects: (int * Rectangle) list) (point: Point) =
         rects |> List.tryFind (fun (_, r) -> hitTest r point) |> Option.map fst

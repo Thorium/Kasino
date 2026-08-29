@@ -367,7 +367,7 @@ let ``strict rules keep the capture modal open on escape`` () =
     let step actions screen = GameScreen.update (mkInput actions) 0.016 1024 768 screen
     let strictScreen =
         let s = mkMultiCaptureScreen ()
-        { s with Config = { s.Config with Settings = { s.Config.Settings with StrictRules = true } } }
+        { s with Config.Settings.StrictRules = true }
     let s1 = strictScreen |> step [ Input.Pick 1 ] |> step [ Input.Continue ]
     (match s1.Phase with
      | GameScreen.ChoosingCaptureOption _ -> ()

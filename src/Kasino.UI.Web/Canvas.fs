@@ -22,7 +22,7 @@ module Gfx =
         g.Ctx?fillStyle <- c.Css
 
     let private applyFont (g: Gfx) =
-        g.Ctx?font <- sprintf "%dpx 'Segoe UI', Arial, sans-serif" g.FontSize
+        g.Ctx?font <- $"%d{g.FontSize}px 'Segoe UI', Arial, sans-serif"
         g.Ctx?textBaseline <- "top"
         g.Ctx?textAlign <- "left"
 

@@ -48,7 +48,7 @@ module Button =
 
     /// Check if the pointer is hovering over the button
     let isHovered (input: InputHandler.InputState) (btn: ButtonDef) =
-        btn.Rect.Contains(input.Mouse.Position)
+        btn.Rect.Contains input.Mouse.Position
 
     /// Check if a button was tapped/clicked this frame
     let isClicked (input: InputHandler.InputState) (btn: ButtonDef) =
@@ -58,12 +58,12 @@ module Button =
     let draw (sb: SpriteBatch) (font: SpriteFontBase) (input: InputHandler.InputState) (btn: ButtonDef) =
         let hover = isHovered input btn
         let bg = if hover then btn.HoverColor else btn.BgColor
-        let bgTex = CardRenderer.getCachedColorTexture (sb.GraphicsDevice) bg
+        let bgTex = CardRenderer.getCachedColorTexture sb.GraphicsDevice bg
         sb.Draw(bgTex, btn.Rect, Color.White)
 
         // 1px border (brighter on hover)
         let borderColor = if hover then Color.White else Color.Gray
-        let borderTex = CardRenderer.getCachedColorTexture (sb.GraphicsDevice) borderColor
+        let borderTex = CardRenderer.getCachedColorTexture sb.GraphicsDevice borderColor
         let r = btn.Rect
         sb.Draw(borderTex, Rectangle(r.X, r.Y, r.Width, 1), Color.White)
         sb.Draw(borderTex, Rectangle(r.X, r.Bottom - 1, r.Width, 1), Color.White)
@@ -71,7 +71,7 @@ module Button =
         sb.Draw(borderTex, Rectangle(r.Right - 1, r.Y, 1, r.Height), Color.White)
 
         // Center text in button
-        let size = font.MeasureString(btn.Text)
+        let size = font.MeasureString btn.Text
         let tx = float32 r.X + (float32 r.Width - size.X) / 2.0f
         let ty = float32 r.Y + (float32 r.Height - size.Y) / 2.0f
         sb.DrawString(font, btn.Text, Vector2(tx, ty), btn.TextColor) |> ignore

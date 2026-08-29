@@ -74,7 +74,7 @@ module ScoreScreen =
 
         let title =
             match state.Phase with
-            | RoundSummary -> sprintf "Round %d Results" state.RoundNumber
+            | RoundSummary -> $"Round %d{state.RoundNumber} Results"
             | GameOver -> "Game Over!"
         drawCentered title 30 Color.Gold
 
@@ -136,7 +136,7 @@ module ScoreScreen =
             let winnerY = startY + 30 + categories.Length * 24 + 20
             let text =
                 match winners with
-                | [ w ] -> sprintf "%s wins with %d points!" w bestScore
+                | [ w ] -> $"%s{w} wins with %d{bestScore} points!"
                 | ws -> sprintf "%s tie with %d points!" (String.concat " & " ws) bestScore
             drawCentered text winnerY Color.Gold
         | RoundSummary -> ()

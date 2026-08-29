@@ -78,7 +78,7 @@ module ScoreScreen =
     let draw (sb: SpriteBatch) (font: SpriteFontBase) (input: InputHandler.InputState) (state: ScoreState) (screenW: int) (screenH: int) =
         let cx = screenW / 2
         let drawCentered (text: string) (y: int) (color: Color) =
-            let size = font.MeasureString(text)
+            let size = font.MeasureString text
             sb.DrawString(font, text, Vector2(float32 cx - size.X / 2.0f, float32 y), color) |> ignore
 
         let drawLeft (text: string) (x: int) (y: int) (color: Color) =

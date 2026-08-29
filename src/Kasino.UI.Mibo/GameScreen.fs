@@ -217,7 +217,7 @@ module GameScreen =
                 let overlaps =
                     result |> Map.exists (fun _ (ox, oy, _) ->
                         let orect = Rectangle(ox - cw / 2, oy - ch / 2, cw, ch)
-                        rect.Intersects(orect))
+                        rect.Intersects orect)
 
                 if not overlaps then
                     bestX <- x; bestY <- y; bestRot <- rot; placed <- true
@@ -237,7 +237,7 @@ module GameScreen =
         |> List.tryPick (fun card ->
             match Map.tryFind card screen.ScatteredPositions with
             | Some (sx, sy, _) ->
-                if Rectangle(sx - cw / 2, sy - ch / 2, cw, ch).Contains(pos) then Some card else None
+                if Rectangle(sx - cw / 2, sy - ch / 2, cw, ch).Contains pos then Some card else None
             | None -> None)
 
     let private clampScatterCenter (screenW: int) (screenH: int) (cx: int) (cy: int) =
@@ -326,7 +326,7 @@ module GameScreen =
     let private cardTextColor (c: Card) =
         match c.Suit with
         | Hearts | Diamonds -> Color(255, 135, 125)
-        | _ -> Color(190, 190, 190)
+        | Spades | Clubs -> Color(190, 190, 190)
 
     /// Label segments for a capture-option button: white prefix/suffix with
     /// each card name tinted by its suit.
@@ -666,7 +666,7 @@ module GameScreen =
                         let btn = playButton screenW screenH screen.Config.Settings.StrictRules preview
                         let canPlaceInstead =
                             gs.Variant = StandardKasino
-                            && (match preview with NoCapture -> false | _ -> true)
+                            && (match preview with NoCapture -> false | SingleCapture _ | MultipleCaptures _ -> true)
                         if screen.SelectedCardIndex.IsSome && Button.isClicked input btn then
                             processHumanPlay screen screen.SelectedCardIndex.Value screenW screenH
                         elif screen.SelectedCardIndex.IsSome && canPlaceInstead
@@ -706,7 +706,7 @@ module GameScreen =
                     let dy = abs(input.Mouse.Position.Y - startPos.Y)
                     if dx > dragThreshold || dy > dragThreshold then
                         let tArea = tableArea screenW screenH
-                        if tArea.Contains(input.Mouse.Position) then
+                        if tArea.Contains input.Mouse.Position then
                             let newScreen = { screen with DragState = NotDragging }
                             let dropPos = (float32 input.Mouse.Position.X, float32 input.Mouse.Position.Y)
                             processHumanPlayFrom newScreen idx (Some dropPos) screenW screenH
@@ -988,7 +988,7 @@ module GameScreen =
                 Button.draw buffer font input (playButton screenW screenH screen.Config.Settings.StrictRules screen.CapturePreview)
                 let canPlaceInstead =
                     gs.Variant = StandardKasino
-                    && (match screen.CapturePreview with NoCapture -> false | _ -> true)
+                    && (match screen.CapturePreview with NoCapture -> false | SingleCapture _ | MultipleCaptures _ -> true)
                 if canPlaceInstead then
                     Button.draw buffer font input (placeInsteadButton screenW screenH)
             | _ -> ()

@@ -57,7 +57,7 @@ let private updateScreen (input: Input.InputState) (dt: float) =
                   Settings = settings }
             rng <- Random()
             let players = GameEngine.createPlayers config
-            dealerOffset <- rng.Next(players.Length)
+            dealerOffset <- rng.Next players.Length
             let scores = players |> List.map (fun p -> p.Name, 0) |> Map.ofList
             let gameScreen = GameScreen.create config rng players 1 scores Scoring.CarryOver.zero dealerOffset
             textures |> Option.iter (applyCardBack config)
@@ -206,8 +206,8 @@ let private resize () =
         let scale = cssH * dpr / float h
         canvas?width <- int (round (float w * scale))
         canvas?height <- int (round (float h * scale))
-        canvas?style?width <- sprintf "%fpx" cssW
-        canvas?style?height <- sprintf "%fpx" cssH
+        canvas?style?width <- $"%f{cssW}px"
+        canvas?style?height <- $"%f{cssH}px"
         // Assigning canvas.width resets the 2D context state, so reapply
         // the logical-coordinates transform afterwards.
         ctx?setTransform (scale, 0.0, 0.0, scale, 0.0, 0.0)

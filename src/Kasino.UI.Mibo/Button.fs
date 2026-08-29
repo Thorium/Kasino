@@ -42,7 +42,7 @@ module Button =
         create text x y w h bgColor textColor
 
     let isHovered (input: Input.InputState) (btn: ButtonDef) =
-        btn.Rect.Contains(input.Mouse.Position)
+        btn.Rect.Contains input.Mouse.Position
 
     let isClicked (input: Input.InputState) (btn: ButtonDef) =
         btn.Rect.Contains(input.Mouse.Position) && input.Mouse.LeftJustClicked

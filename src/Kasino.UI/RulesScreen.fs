@@ -178,7 +178,7 @@ module RulesScreen =
     let private card s r : Card = { Suit = s; Rank = r }
 
     let private centerLine (sb: SpriteBatch) (font: SpriteFontBase) (cx: float32) (text: string) (y: int) (col: Color) =
-        let sz = font.MeasureString(text)
+        let sz = font.MeasureString text
         sb.DrawString(font, text, Vector2(cx - sz.X / 2.0f, float32 y), col) |> ignore
 
     let private drawCardAt (sb: SpriteBatch) (tex: CardRenderer.CardTextures) (c: Card) (x: int) (y: int) =
@@ -194,7 +194,7 @@ module RulesScreen =
         |> List.iteri (fun i (c, lbl) ->
             let x = startX + i * (cw + gap)
             drawCardAt sb tex c x y
-            let sz = (font: SpriteFontBase).MeasureString(lbl)
+            let sz = (font: SpriteFontBase).MeasureString lbl
             sb.DrawString(font, lbl, Vector2(float32 x + float32 cw / 2.0f - sz.X / 2.0f, float32 (y + ch + 6)), col) |> ignore)
 
     /// A group of cards laid left-to-right at (x, y), with a label to the right.
@@ -269,7 +269,7 @@ module RulesScreen =
         let cx = float32 screenW / 2.0f
 
         let drawCentered (text: string) (y: int) (color: Color) =
-            let size = font.MeasureString(text)
+            let size = font.MeasureString text
             sb.DrawString(font, text, Vector2(cx - size.X / 2.0f, float32 y), color) |> ignore
 
         // Header
@@ -283,7 +283,7 @@ module RulesScreen =
         drawCentered indicator 80 Color.Gray
 
         // Separator line
-        let lineTex = CardRenderer.getCachedColorTexture (sb.GraphicsDevice) Color.DarkGray
+        let lineTex = CardRenderer.getCachedColorTexture sb.GraphicsDevice Color.DarkGray
         sb.Draw(lineTex, Rectangle(40, 100, screenW - 80, 1), Color.White)
 
         match pages.[state.CurrentPage] with
@@ -294,7 +294,7 @@ module RulesScreen =
                 let line = lines[i]
                 let y = startY + i * lineH
                 let color =
-                    if line.StartsWith("  ") then Color.LightGray
+                    if line.StartsWith "  " then Color.LightGray
                     elif line = "" then Color.Transparent
                     else Color.White
                 sb.DrawString(font, line, Vector2(50.0f, float32 y), color) |> ignore

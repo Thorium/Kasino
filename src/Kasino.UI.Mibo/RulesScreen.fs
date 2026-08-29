@@ -275,7 +275,7 @@ module RulesScreen =
                 let line = lines[i]
                 let y = startY + i * lineH
                 if line <> "" then
-                    let color = if line.StartsWith("  ") then Color.LightGray else Color.White
+                    let color = if line.StartsWith "  " then Color.LightGray else Color.White
                     Render.text buffer Render.LLabel font line (Vector2(50.0f, float32 y)) color
         | VisualPage(_, vid) ->
             match texOpt with

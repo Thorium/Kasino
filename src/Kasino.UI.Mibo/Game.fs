@@ -90,7 +90,7 @@ module Game =
         let textures = CardRenderer.loadAll device (findContentDir ())
         CardRenderer.Scale <- float32 WindowH / 768.0f
         let assets = GameContext.getService<IAssets> ctx
-        let font = assets.Font("fonts/UI")
+        let font = assets.Font "fonts/UI"
         struct ({ freshModel () with Textures = Some textures; Font = Some font }, Cmd.none)
 
     /// Init for the headless runtime: no window, no graphics services.
@@ -114,7 +114,7 @@ module Game =
                       Settings = model.Settings }
                 let rng = Random()
                 let players = GameEngine.createPlayers config
-                let dealerOffset = rng.Next(players.Length)
+                let dealerOffset = rng.Next players.Length
                 let scores = players |> List.map (fun p -> p.Name, 0) |> Map.ofList
                 let gameScreen = GameScreen.create config rng players 1 scores Scoring.CarryOver.zero dealerOffset
                 model.Textures |> Option.iter (applyCardBack rng config)
