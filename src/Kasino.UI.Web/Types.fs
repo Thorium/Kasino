@@ -14,7 +14,7 @@ type Color =
     /// CSS rgba() string for use as a canvas fill style.
     member c.Css =
         let a = float (max 0 (min 255 c.A)) / 255.0
-        sprintf "rgba(%d,%d,%d,%g)" c.R c.G c.B a
+        $"rgba(%d{c.R},%d{c.G},%d{c.B},%g{a})"
 
 module Color =
     let rgba r g b a = { R = r; G = g; B = b; A = a }

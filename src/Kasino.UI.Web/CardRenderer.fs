@@ -56,7 +56,7 @@ module CardRenderer =
 
     let private newImage (file: string) : HTMLImageElement =
         let img = document.createElement "img" :?> HTMLImageElement
-        img.src <- baseUrl + "cards/" + file
+        img.src <- $"{baseUrl}cards/{file}"
         img
 
     /// Load every card image and invoke `onReady` once all have settled

@@ -278,7 +278,7 @@ module RulesScreen =
                 let line = lines[i]
                 let y = startY + i * lineH
                 let color =
-                    if line.StartsWith("  ") then Color.LightGray
+                    if line.StartsWith "  " then Color.LightGray
                     elif line = "" then Color.Transparent
                     else Color.White
                 Gfx.fillText g line 50.0 (float y) color

@@ -255,7 +255,7 @@ module GameScreen =
                 let overlaps =
                     result |> Map.exists (fun _ (ox, oy, _) ->
                         let orect = Rectangle(ox - cw / 2, oy - ch / 2, cw, ch)
-                        rect.Intersects(orect))
+                        rect.Intersects orect)
 
                 if not overlaps then
                     bestX <- x; bestY <- y; bestRot <- rot; placed <- true
@@ -277,7 +277,7 @@ module GameScreen =
         |> List.tryPick (fun card ->
             match Map.tryFind card screen.ScatteredPositions with
             | Some (sx, sy, _) ->
-                if Rectangle(sx - cw / 2, sy - ch / 2, cw, ch).Contains(pos) then Some card else None
+                if Rectangle(sx - cw / 2, sy - ch / 2, cw, ch).Contains pos then Some card else None
             | None -> None)
 
     /// Clamp a scattered card's centre so the whole card stays within the table area.
@@ -403,7 +403,7 @@ module GameScreen =
     let private cardTextColor (c: Card) =
         match c.Suit with
         | Hearts | Diamonds -> Color(255, 135, 125)
-        | _ -> Color(190, 190, 190)
+        | Spades | Clubs -> Color(190, 190, 190)
 
     /// Label segments for a capture-option button: white prefix/suffix with
     /// each card name tinted by its suit.
@@ -774,7 +774,7 @@ module GameScreen =
                         let btn = playButton screenW screenH screen.Config.Settings.StrictRules preview
                         let canPlaceInstead =
                             gs.Variant = StandardKasino
-                            && (match preview with NoCapture -> false | _ -> true)
+                            && (match preview with NoCapture -> false | SingleCapture _ | MultipleCaptures _ -> true)
                         if screen.SelectedCardIndex.IsSome && Button.isClicked input btn then
                             processHumanPlay screen screen.SelectedCardIndex.Value screenW screenH
                         elif screen.SelectedCardIndex.IsSome && canPlaceInstead
@@ -818,7 +818,7 @@ module GameScreen =
                     if dx > dragThreshold || dy > dragThreshold then
                         // It was a real drag — check if dropped on table area
                         let tArea = tableArea screenW screenH
-                        if tArea.Contains(input.Mouse.Position) then
+                        if tArea.Contains input.Mouse.Position then
                             // Play the card, continuing the slide from the drop
                             // point rather than snapping back to the hand slot.
                             let newScreen = { screen with DragState = NotDragging }
@@ -1078,7 +1078,7 @@ module GameScreen =
             let humanIdx = 0
             let human = gs.Players[humanIdx]
             let handSize = dealVisible human.Name (List.length human.Hand)
-            let isDraggingIdx = match screen.DragState with Dragging(idx, _, _) -> Some idx | _ -> None
+            let isDraggingIdx = match screen.DragState with Dragging(idx, _, _) -> Some idx | NotDragging | DraggingTable _ -> None
             for i in 0 .. handSize - 1 do
                 // Skip drawing card at its normal position if being dragged
                 if isDraggingIdx = Some i then () else
@@ -1112,7 +1112,7 @@ module GameScreen =
                 Button.draw sb font input (playButton screenW screenH screen.Config.Settings.StrictRules screen.CapturePreview)
                 let canPlaceInstead =
                     gs.Variant = StandardKasino
-                    && (match screen.CapturePreview with NoCapture -> false | _ -> true)
+                    && (match screen.CapturePreview with NoCapture -> false | SingleCapture _ | MultipleCaptures _ -> true)
                 if canPlaceInstead then
                     Button.draw sb font input (placeInsteadButton screenW screenH)
             | _ -> ()
@@ -1159,13 +1159,13 @@ module GameScreen =
         // ── Table-talk bubble (optional AI chat) ────────
         match screen.Chat with
         | Some(text, _) ->
-            let size = font.MeasureString(text)
+            let size = font.MeasureString text
             let pad = 10
             let bw = int size.X + pad * 2
             let bh = int size.Y + pad
             let bx = (screenW - bw) / 2
             let by = statusY - bh - 12
-            let bgTex = CardRenderer.getCachedColorTexture (sb.GraphicsDevice) (Color(20, 20, 30, 220))
+            let bgTex = CardRenderer.getCachedColorTexture sb.GraphicsDevice (Color(20, 20, 30, 220))
             sb.Draw(bgTex, Rectangle(bx, by, bw, bh), Color.White)
             sb.DrawString(font, text, Vector2(float32 (bx + pad), float32 (by + pad / 2)), Color.LightYellow) |> ignore
         | None -> ()
@@ -1304,14 +1304,14 @@ module GameScreen =
         match screen.Phase with
         | ChoosingCaptureOption(_, options, page) ->
             // Semi-transparent dark overlay
-            let overlayTex = CardRenderer.getCachedColorTexture (sb.GraphicsDevice) (Color(0, 0, 0, 160))
+            let overlayTex = CardRenderer.getCachedColorTexture sb.GraphicsDevice (Color(0, 0, 0, 160))
             sb.Draw(overlayTex, Rectangle(0, 0, screenW, screenH), Color.White)
 
             let modal = captureModal gs.Variant screen.Config.Settings.StrictRules options page screenW screenH
 
             // Header text
             let headerText = "Choose which cards to capture:"
-            let headerSize = font.MeasureString(headerText)
+            let headerSize = font.MeasureString headerText
             let headerY =
                 match modal.OptionButtons with
                 | (_, btn) :: _ -> float32 btn.Rect.Y - headerSize.Y - 12.0f

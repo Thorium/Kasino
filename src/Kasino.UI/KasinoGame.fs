@@ -27,7 +27,7 @@ module private SdlIcon =
             use tex = Graphics.Texture2D.FromStream(gd, stream)
             let w, h = tex.Width, tex.Height
             let pixels: Color array = Array.zeroCreate (w * h)
-            tex.GetData(pixels)
+            tex.GetData pixels
             let bytes: byte array = Array.zeroCreate (w * h * 4)
             for i in 0 .. pixels.Length - 1 do
                 let p = pixels[i]
@@ -148,8 +148,8 @@ type KasinoGame() as this =
             // instead of a cryptic NullReferenceException at GetFont.
             failwith "No TTF font found. Install a system font (e.g. DejaVu/Liberation on Linux) or place a .ttf alongside the executable."
 
-        font <- fontSystem.GetFont(24.0f)
-        fontSmall <- fontSystem.GetFont(18.0f)
+        font <- fontSystem.GetFont 24.0f
+        fontSmall <- fontSystem.GetFont 18.0f
 
         // Load card textures
         let contentDir = Path.Combine(AppContext.BaseDirectory, "Content")
@@ -207,7 +207,7 @@ type KasinoGame() as this =
                       Settings = settings }
                 rng <- Random()
                 let players = GameEngine.createPlayers config
-                dealerOffset <- rng.Next(players.Length)
+                dealerOffset <- rng.Next players.Length
                 let scores = players |> List.map (fun p -> p.Name, 0) |> Map.ofList
                 let gameScreen = GameScreen.create config rng players 1 scores Scoring.CarryOver.zero dealerOffset
                 textures |> Option.iter (applyCardBack config)
@@ -322,7 +322,7 @@ type KasinoGame() as this =
             graphics.ApplyChanges()
             CardRenderer.Scale <- float32 (screenH()) / 768.0f * 1.0f
 
-        base.Update(gameTime)
+        base.Update gameTime
 
     override _.Draw(gameTime) =
         this.GraphicsDevice.Clear(Color(25, 50, 35))
@@ -344,4 +344,4 @@ type KasinoGame() as this =
 
         spriteBatch.End()
 
-        base.Draw(gameTime)
+        base.Draw gameTime

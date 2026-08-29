@@ -61,7 +61,7 @@ module CardRenderer =
     /// Create a 1x1 colored texture (utility)
     let createColorTexture (device: GraphicsDevice) (color: Color) =
         let tex = new Texture2D(device, 1, 1)
-        tex.SetData([| color |])
+        tex.SetData [| color |]
         tex
 
     /// Generate a procedural card back texture with a Balatro-inspired diamond pattern
@@ -90,9 +90,9 @@ module CardRenderer =
         let dotColor = Color(200, 160, 60)            // gold dots at intersections
 
         for x in 5 .. w - 6 do
+            let dx = (x - 5) % 8
             for y in 5 .. h - 6 do
                 // Diamond grid pattern with 8px spacing
-                let dx = (x - 5) % 8
                 let dy = (y - 5) % 8
                 // Diamond shape: |dx - 4| + |dy - 4| == 3
                 let dist = abs(dx - 4) + abs(dy - 4)
@@ -119,7 +119,7 @@ module CardRenderer =
                         pixels[y * w + x] <- Color(160, 40, 40)   // red center
 
         let tex = new Texture2D(device, w, h)
-        tex.SetData(pixels)
+        tex.SetData pixels
         tex
 
     /// Generate a poker-green felt texture with woven fiber pattern
@@ -164,7 +164,7 @@ module CardRenderer =
                 pixels[y * w + x] <- Color(r, g, b)
 
         let tex = new Texture2D(device, w, h)
-        tex.SetData(pixels)
+        tex.SetData pixels
         tex
 
     /// Load all card textures from the Content/cards directory
@@ -186,7 +186,7 @@ module CardRenderer =
         let scenicBacks =
             [ 1 .. 9 ]
             |> List.choose (fun i ->
-                let p = Path.Combine(cardsDir, sprintf "back%d.png" i)
+                let p = Path.Combine(cardsDir, $"back%d{i}.png")
                 if File.Exists(p) then Some(loadTexture device p) else None)
 
         let defaultBack =
@@ -238,7 +238,7 @@ module CardRenderer =
     /// Get or create a cached 1x1 color texture (avoids allocating every frame)
     let getCachedColorTexture (device: GraphicsDevice) (color: Color) =
         let key = color.PackedValue
-        match colorTextureCache.TryGetValue(key) with
+        match colorTextureCache.TryGetValue key with
         | true, tex -> tex
         | false, _ ->
             let tex = createColorTexture device color
@@ -249,7 +249,7 @@ module CardRenderer =
     let drawCardHighlighted (sb: SpriteBatch) (textures: CardTextures) (card: Card) (x: int) (y: int) (borderColor: Color) =
         let bw = 3
         let borderRect = Rectangle(x - bw, y - bw, scaledWidth() + bw * 2, scaledHeight() + bw * 2)
-        let borderTex = getCachedColorTexture (sb.GraphicsDevice) borderColor
+        let borderTex = getCachedColorTexture sb.GraphicsDevice borderColor
         sb.Draw(borderTex, borderRect, Color.White)
         drawCard sb textures card x y
 
@@ -258,7 +258,7 @@ module CardRenderer =
     /// premultiplied-alpha squaring (color in texture * color in tint).
     let drawCardWithOverlay (sb: SpriteBatch) (textures: CardTextures) (card: Card) (x: int) (y: int) (overlayColor: Color) =
         drawCard sb textures card x y
-        let whiteTex = getCachedColorTexture (sb.GraphicsDevice) Color.White
+        let whiteTex = getCachedColorTexture sb.GraphicsDevice Color.White
         let dest = Rectangle(x, y, scaledWidth(), scaledHeight())
         sb.Draw(whiteTex, dest, overlayColor)
 
@@ -274,7 +274,7 @@ module CardRenderer =
     /// Draw a card with overlay and rotation
     let drawCardWithOverlayRotated (sb: SpriteBatch) (textures: CardTextures) (card: Card) (x: int) (y: int) (overlayColor: Color) (rotation: float32) =
         drawCardRotated sb textures card x y rotation
-        let whiteTex = getCachedColorTexture (sb.GraphicsDevice) Color.White
+        let whiteTex = getCachedColorTexture sb.GraphicsDevice Color.White
         let w = scaledWidth()
         let h = scaledHeight()
         let origin = Vector2(0.5f, 0.5f)

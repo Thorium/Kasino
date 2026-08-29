@@ -70,19 +70,19 @@ module Input =
     /// "Numpad3") so the NumPad still works with NumLock off.
     let private parseDigit (key: string) (code: string) =
         match key with
-        | "0" -> Some 0
-        | "1" -> Some 1
-        | "2" -> Some 2
-        | "3" -> Some 3
-        | "4" -> Some 4
+        | "0" -> ValueSome 0
+        | "1" -> ValueSome 1
+        | "2" -> ValueSome 2
+        | "3" -> ValueSome 3
+        | "4" -> ValueSome 4
         | _ ->
             match code with
-            | "Digit0" | "Numpad0" -> Some 0
-            | "Digit1" | "Numpad1" -> Some 1
-            | "Digit2" | "Numpad2" -> Some 2
-            | "Digit3" | "Numpad3" -> Some 3
-            | "Digit4" | "Numpad4" -> Some 4
-            | _ -> None
+            | "Digit0" | "Numpad0" -> ValueSome 0
+            | "Digit1" | "Numpad1" -> ValueSome 1
+            | "Digit2" | "Numpad2" -> ValueSome 2
+            | "Digit3" | "Numpad3" -> ValueSome 3
+            | "Digit4" | "Numpad4" -> ValueSome 4
+            | _ -> ValueNone
 
     /// Wire up pointer + keyboard listeners against the given canvas.
     let init (canvas: HTMLCanvasElement) =
@@ -139,8 +139,8 @@ module Input =
                 | "ArrowRight" -> rightKeyJust <- true
                 | key ->
                     match parseDigit key code with
-                    | Some n -> numberJust <- Some n
-                    | None -> ())
+                    | ValueSome n -> numberJust <- Some n
+                    | ValueNone -> ())
 
         window.addEventListener ("keyup", fun e ->
             let k = e :?> KeyboardEvent

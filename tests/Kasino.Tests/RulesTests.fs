@@ -102,7 +102,7 @@ let ``playCard should detect sweep when table is cleared`` () =
     let result, newTable, _ = Rules.playCard hand table
     match result with
     | Capture(_, _, isSweep) -> Assert.True(isSweep)
-    | _ -> Assert.Fail("Expected capture")
+    | Place _ -> Assert.Fail("Expected capture")
     Assert.Empty(newTable)
 
 [<Fact>]
@@ -112,7 +112,7 @@ let ``playCard should NOT be a sweep when table cards remain`` () =
     let result, _, _ = Rules.playCard hand table
     match result with
     | Capture(_, _, isSweep) -> Assert.False(isSweep)
-    | _ -> Assert.Fail("Expected capture")
+    | Place _ -> Assert.Fail("Expected capture")
 
 [<Fact>]
 let ``resolveCapture should compute correct result`` () =
@@ -126,7 +126,7 @@ let ``resolveCapture should compute correct result`` () =
     | Capture(_, captured, isSweep) ->
         Assert.Equal(1, captured.Length)
         Assert.False(isSweep)
-    | _ -> Assert.Fail("Expected capture")
+    | Place _ -> Assert.Fail("Expected capture")
     Assert.Equal(1, newTable.Length)
 
 [<Fact>]
@@ -139,7 +139,7 @@ let ``resolveCapture should detect sweep`` () =
     let result, newTable = Rules.resolveCapture hand option table
     match result with
     | Capture(_, _, isSweep) -> Assert.True(isSweep)
-    | _ -> Assert.Fail("Expected capture")
+    | Place _ -> Assert.Fail("Expected capture")
     Assert.Empty(newTable)
 
 [<Fact>]
