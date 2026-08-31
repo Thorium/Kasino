@@ -110,9 +110,18 @@ module CardRenderer =
             for y in 0 .. h - 1 do
                 let baseR, baseG, baseB = 35, 100, 55
                 let fineNoise = rng.Next(-6, 7)
-                let hFiber = let row = y % 4 in if row = 0 then -3 elif row = 2 then 2 else 0
-                let vFiber = let col = x % 6 in if col = 0 then -2 elif col = 3 then 1 else 0
-                let weave = let d = (x + y) % 8 in if d = 0 then -2 elif d = 4 then 1 else 0
+                let hFiber = let row = y % 4 in match row with
+                                                | 0 -> -3
+                                                | 2 -> 2
+                                                | _ -> 0
+                let vFiber = let col = x % 6 in match col with
+                                                | 0 -> -2
+                                                | 3 -> 1
+                                                | _ -> 0
+                let weave = let d = (x + y) % 8 in match d with
+                                                   | 0 -> -2
+                                                   | 4 -> 1
+                                                   | _ -> 0
                 let regionNoise =
                     let rx = float32 x / 32.0f |> sin |> (*) 2.0f |> int
                     let ry = float32 y / 24.0f |> cos |> (*) 2.0f |> int

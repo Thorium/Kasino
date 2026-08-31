@@ -95,8 +95,8 @@ module MenuScreen =
                 | Some 0 -> { state with HumanCount = 0; Step = Ready }
                 | Some 1 -> { state with HumanCount = 1; Step = Ready }
                 | _ -> state
-        | Ready -> state
-        | ShowRules -> state
+        | Ready
+        | ShowRules
         | ShowOptions -> state
 
     // ── Draw ──
@@ -135,7 +135,7 @@ module MenuScreen =
             drawCentered $"Variant: {vName}  |  Players: {state.PlayerCount}" 140 Color.Gold
             drawCentered "How many human players?" 180 Color.LightGray
             Button.drawAll buffer font input (humanCountButtons screenW)
-        | Ready -> ()
+        | Ready
         | ShowRules | ShowOptions -> ()
 
         match state.Step with

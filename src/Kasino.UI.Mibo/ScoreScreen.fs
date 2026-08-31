@@ -116,9 +116,10 @@ module ScoreScreen =
             for i in 0 .. rows.Length - 1 do
                 let y = startY + 30 + i * 24
                 let color =
-                    if i = 7 then Color.Yellow
-                    elif i = 9 then Color.Gold
-                    else Color.White
+                    match i with
+                    | 7 -> Color.Yellow
+                    | 9 -> Color.Gold
+                    | _ -> Color.White
                 drawLeft rows[i] x y color)
 
         match state.Phase with
