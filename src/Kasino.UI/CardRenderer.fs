@@ -15,7 +15,9 @@ open Kasino.Domain
 
 module CardRenderer =
 
+    [<Literal>]
     let CardWidth  = 75
+    [<Literal>]
     let CardHeight = 95
 
     /// Scale factor for rendering cards
@@ -139,17 +141,26 @@ module CardRenderer =
                 // Horizontal fiber lines: subtle brightness variation every 2-3 pixels
                 let hFiber =
                     let row = y % 4
-                    if row = 0 then -3 elif row = 2 then 2 else 0
+                    match row with
+                    | 0 -> -3
+                    | 2 -> 2
+                    | _ -> 0
 
                 // Vertical fiber lines: fainter cross-weave
                 let vFiber =
                     let col = x % 6
-                    if col = 0 then -2 elif col = 3 then 1 else 0
+                    match col with
+                    | 0 -> -2
+                    | 3 -> 1
+                    | _ -> 0
 
                 // Diagonal weave pattern: very subtle, every 8px
                 let weave =
                     let d = (x + y) % 8
-                    if d = 0 then -2 elif d = 4 then 1 else 0
+                    match d with
+                    | 0 -> -2
+                    | 4 -> 1
+                    | _ -> 0
 
                 // Slight large-scale color variation (simulates dye irregularity)
                 let regionNoise =

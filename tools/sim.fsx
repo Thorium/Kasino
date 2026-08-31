@@ -35,7 +35,7 @@ let mkConfig variant playerCount : GameEngine.GameConfig =
 /// Play one round to completion (all-CPU seats). Returns per-seat round Totals.
 let playRound (config: GameEngine.GameConfig) (rng: Random) (players: Player list) (roundNumber: int) : int[] =
     let start = GameEngine.dealRound (GameEngine.newRound config rng players roundNumber) true
-    let mutable state = { start with DealRound = 1 }
+    let state = { start with DealRound = 1 }
     let rec loop (s: GameEngine.GameState) =
         if GameEngine.allHandsEmpty s then
             if s.DealRound < s.TotalDeals then
@@ -96,6 +96,7 @@ let run (variant: GameVariant) (playerCount: int) (nGames: int) =
     printfn "   draws %.1f%%   avg rounds/game %.2f" (pct draws) (float totalRounds / float nGames)
     printfn ""
 
+[<Literal>]
 let games = 3000
 printfn "Kasino self-play harness  (games=%d)\n" games
 run StandardKasino 2 games

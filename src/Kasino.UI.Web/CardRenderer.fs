@@ -16,7 +16,9 @@ open Kasino.Domain
 
 module CardRenderer =
 
+    [<Literal>]
     let CardWidth = 75
+    [<Literal>]
     let CardHeight = 95
 
     /// Scale factor for rendering cards (canvas is a fixed 768 tall => 1.0).

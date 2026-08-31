@@ -102,8 +102,8 @@ module MenuScreen =
                 | Some 0 -> { state with HumanCount = 0; Step = Ready }
                 | Some 1 -> { state with HumanCount = 1; Step = Ready }
                 | _ -> state
-        | Ready -> state
-        | ShowRules -> state
+        | Ready
+        | ShowRules
         | ShowOptions -> state
 
     /// Draw menu screen with tappable buttons
@@ -149,11 +149,8 @@ module MenuScreen =
             drawCentered "How many human players?" 180 Color.LightGray
             Button.drawAll sb font input (humanCountButtons screenW)
 
-        | Ready ->
-            ()
-
-        | ShowRules | ShowOptions ->
-            ()   // handled by KasinoGame — should not draw menu in these states
+        | Ready
+        | ShowRules | ShowOptions -> ()   // handled by KasinoGame — should not draw menu in these states
 
         // "Options" / "How to Play" buttons visible on all non-transitional steps
         match state.Step with

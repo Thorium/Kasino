@@ -8,7 +8,9 @@ namespace Kasino.UI.Web
 
 module Button =
 
+    [<Literal>]
     let MinTouchHeight = 48
+    [<Literal>]
     let MinTouchWidth = 120
 
     type ButtonDef =

@@ -26,8 +26,10 @@ module GameScreen =
 
     /// Phase of the game screen
     type Phase =
-        | Shuffling of elapsed: float          // shuffle animation before dealing
-        | Dealing of step: int * elapsed: float * steps: DealStep list  // animated dealing
+        /// shuffle animation before dealing
+        | Shuffling of elapsed: float
+        /// animated dealing
+        | Dealing of step: int * elapsed: float * steps: DealStep list
         | WaitingForHuman
         | ComputerThinking of elapsed: float
         | AnimatingPlay of elapsed: float * AI.PlayEvaluation * cardAnim: CardAnimation option * collectAnim: CollectAnimation option
@@ -67,7 +69,8 @@ module GameScreen =
     type DragState =
         | NotDragging
         | Dragging of cardIndex: int * startPos: Point * currentPos: Point
-        | DraggingTable of card: Card * grabOffsetX: int * grabOffsetY: int   // nudging a table card (scatter mode)
+        /// nudging a table card (scatter mode)
+        | DraggingTable of card: Card * grabOffsetX: int * grabOffsetY: int
 
     /// Table card layout mode
     type TableLayout =
@@ -98,17 +101,24 @@ module GameScreen =
           ScatteredPositions: Map<Card, (int * int * float32)>   // card -> (x, y, rotation)
           Chat: (string * float) option }      // active table-talk line + seconds remaining
 
+    [<Literal>]
     let private computerDelay = 0.8
+    [<Literal>]
     let private animDelay = 1.4        // slightly longer to fit collect animation
+    [<Literal>]
     let private shuffleDuration = 0.6
     // Slow enough to register — at 0.25s a player's own play was over before
     // their eyes returned from the click, and the computer's reply slide was
     // routinely mistaken for it.
+    [<Literal>]
     let private cardSlideDuration = 0.4
+    [<Literal>]
     let private collectSlideDuration = 0.35
+    [<Literal>]
     let private dealStepDuration = 0.18         // seconds per deal step (pair of cards slides)
 
     /// Drag threshold in pixels before starting a drag
+    [<Literal>]
     let private dragThreshold = 8
 
     /// Format a play result as a human-readable message
@@ -122,7 +132,9 @@ module GameScreen =
             $"{playerName} places {Cards.display hc} on table"
 
     /// Card spacing constants
+    [<Literal>]
     let private cardGap = 8
+    [<Literal>]
     let private tableCardGap = 6
 
     // ── Layout helpers ──────────────────────────────────────
