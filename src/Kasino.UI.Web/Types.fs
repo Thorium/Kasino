@@ -8,6 +8,7 @@ namespace Kasino.UI.Web
 // ─────────────────────────────────────────────────────────────
 
 /// RGBA color (0-255 channels). Mirrors Microsoft.Xna.Framework.Color.
+[<Struct>]
 type Color =
     { R: int; G: int; B: int; A: int }
 
@@ -43,11 +44,13 @@ module Color =
     let Transparent  = rgba 0 0 0 0
 
 /// Integer 2D point. Mirrors Microsoft.Xna.Framework.Point.
+[<Struct>]
 type Point =
     { X: int; Y: int }
     static member Zero = { X = 0; Y = 0 }
 
 /// Integer rectangle. Mirrors the handful of Rectangle members the UI uses.
+[<Struct>]
 type Rect =
     { X: int; Y: int; Width: int; Height: int }
 
@@ -65,4 +68,5 @@ type Rect =
         not (a.Right <= b.X || b.Right <= a.X || a.Bottom <= b.Y || b.Bottom <= a.Y)
 
 /// Result of measuring a string (width X, line height Y) — mirrors Vector2.
+[<Struct>]
 type TextSize = { X: float; Y: float }

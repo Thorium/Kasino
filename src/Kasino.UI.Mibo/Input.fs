@@ -22,12 +22,18 @@ module Input =
 
     /// Semantic UI actions; every key is bound in [uiMap] below.
     type UiAction =
-        | Continue          // confirm / advance (Enter)
-        | Back              // back / cancel / quit from the menu (Escape)
-        | PrevPage          // rules paging (Left)
-        | NextPage          // rules paging (Right)
-        | ToggleFullscreen  // F11
-        | Pick of int       // menu / capture-modal option N (digit row + numpad)
+        /// confirm / advance (Enter)
+        | Continue
+        /// back / cancel / quit from the menu (Escape)
+        | Back
+        /// rules paging (Left)
+        | PrevPage
+        /// rules paging (Right)
+        | NextPage
+        /// F11
+        | ToggleFullscreen
+        /// menu / capture-modal option N (digit row + numpad)
+        | Pick of int
 
     /// The one InputMap for the whole app. Screens are modal (menu, game,
     /// rules, ...) so a single static map with per-screen interpretation of

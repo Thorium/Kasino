@@ -96,6 +96,7 @@ let run (variant: GameVariant) (playerCount: int) (nGames: int) =
     printfn "   draws %.1f%%   avg rounds/game %.2f" (pct draws) (float totalRounds / float nGames)
     printfn ""
 
+[<Literal>]
 let games = 3000
 printfn "Kasino self-play harness  (games=%d)\n" games
 run StandardKasino 2 games

@@ -13,7 +13,9 @@ open Mibo.Elmish.Graphics2D
 
 module Button =
 
+    [<Literal>]
     let MinTouchHeight = 48
+    [<Literal>]
     let MinTouchWidth = 120
 
     type ButtonDef =

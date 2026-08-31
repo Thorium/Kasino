@@ -50,7 +50,8 @@ module GameScreen =
     type DragState =
         | NotDragging
         | Dragging of cardIndex: int * startPos: Point * currentPos: Point
-        | DraggingTable of card: Card * grabOffsetX: int * grabOffsetY: int   // nudging a table card (scatter mode)
+        /// nudging a table card (scatter mode)
+        | DraggingTable of card: Card * grabOffsetX: int * grabOffsetY: int
 
     type TableLayout =
         | StrictGrid
@@ -79,16 +80,23 @@ module GameScreen =
           ScatteredPositions: Map<Card, (int * int * float)>
           Chat: (string * float) option }      // active table-talk line + seconds remaining
 
+    [<Literal>]
     let private computerDelay = 0.8
+    [<Literal>]
     let private animDelay = 1.4
+    [<Literal>]
     let private shuffleDuration = 0.6
     // Slow enough to register — at 0.25s a player's own play was over before
     // their eyes returned from the tap, and the computer's reply slide was
     // routinely mistaken for it.
+    [<Literal>]
     let private cardSlideDuration = 0.4
+    [<Literal>]
     let private collectSlideDuration = 0.35
+    [<Literal>]
     let private dealStepDuration = 0.18
 
+    [<Literal>]
     let private dragThreshold = 8
 
     let private formatPlayResult (playerName: string) (result: PlayResult) =
@@ -100,7 +108,9 @@ module GameScreen =
         | Place hc ->
             sprintf "%s places %s on table" playerName (Cards.display hc)
 
+    [<Literal>]
     let private cardGap = 8
+    [<Literal>]
     let private tableCardGap = 6
 
     // ── Layout helpers ──────────────────────────────────────
@@ -450,6 +460,7 @@ module GameScreen =
           Chat = None }
 
     // ── Update logic ────────────────────────────────────────
+    [<TailCall>]
     let rec private advanceTurn (screen: ScreenState) =
         let gs = screen.GameState
         if GameEngine.allHandsEmpty gs then

@@ -171,9 +171,13 @@ let private g = Gfx.create ctx
 // uniform transform back to logical coordinates so the upscaled board and
 // especially text stay crisp. Pointer positions are mapped into the
 // logical space in Input.fs.
+[<Literal>]
 let private baseLogicalHeight = 768
+[<Literal>]
 let private baseLogicalWidth = 1024
+[<Literal>]
 let private maxLogicalWidth = 2048
+[<Literal>]
 let private maxLogicalHeight = 1280
 
 let private resize () =

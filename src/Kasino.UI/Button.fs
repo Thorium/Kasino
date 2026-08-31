@@ -14,7 +14,9 @@ open FontStashSharp
 module Button =
 
     /// Minimum touch-friendly dimensions
+    [<Literal>]
     let MinTouchHeight = 48
+    [<Literal>]
     let MinTouchWidth = 120
 
     /// A button definition — stateless, typically recomputed each frame

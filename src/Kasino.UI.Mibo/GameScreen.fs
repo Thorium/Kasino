@@ -84,13 +84,20 @@ module GameScreen =
           ScatteredPositions: Map<Card, (int * int * float32)>
           Chat: (string * float) option }
 
+    [<Literal>]
     let private computerDelay = 0.8
+    [<Literal>]
     let private animDelay = 1.4
+    [<Literal>]
     let private shuffleDuration = 0.6
+    [<Literal>]
     let private cardSlideDuration = 0.4
+    [<Literal>]
     let private collectSlideDuration = 0.35
+    [<Literal>]
     let private dealStepDuration = 0.18
 
+    [<Literal>]
     let private dragThreshold = 8
 
     let private formatPlayResult (playerName: string) (result: PlayResult) =
@@ -102,7 +109,9 @@ module GameScreen =
         | Place hc ->
             $"{playerName} places {Cards.display hc} on table"
 
+    [<Literal>]
     let private cardGap = 8
+    [<Literal>]
     let private tableCardGap = 6
 
     // ── Layout helpers ──

@@ -11,6 +11,7 @@ open Kasino.Domain
 
 module RulesScreen =
 
+    [<Struct>]
     type RulesState =
         { CurrentPage: int
           BackClicked: bool }
@@ -166,7 +167,9 @@ module RulesScreen =
         Button.create "Next" (cx + 90) (screenH - 70) 160 52 (Color(40, 100, 40)) Color.White
 
     // ── Visual-page drawing helpers ──
+    [<Literal>]
     let private cw = 60
+    [<Literal>]
     let private ch = 76
     let private card s r : Card = { Suit = s; Rank = r }
 

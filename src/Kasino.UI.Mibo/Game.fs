@@ -22,7 +22,9 @@ open Kasino.Domain
 
 module Game =
 
+    [<Literal>]
     let WindowW = 1024
+    [<Literal>]
     let WindowH = 768
 
     /// The MonoGame GraphicsDeviceManager, captured at composition time so F11

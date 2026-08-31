@@ -58,8 +58,10 @@ type ActiveScreen =
     | Menu of MenuScreen.MenuState
     | Playing of GameScreen.ScreenState
     | Scores of ScoreScreen.ScoreState
-    | Rules of RulesScreen.RulesState * ActiveScreen        // rules overlay + screen to return to
-    | Options of OptionsScreen.OptionsState * ActiveScreen  // options overlay + screen to return to
+    /// rules overlay + screen to return to
+    | Rules of RulesScreen.RulesState * ActiveScreen
+    /// options overlay + screen to return to
+    | Options of OptionsScreen.OptionsState * ActiveScreen
 
 type KasinoGame() as this =
     inherit Game()

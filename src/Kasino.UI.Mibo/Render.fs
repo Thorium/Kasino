@@ -27,6 +27,7 @@ module Render =
     /// SpriteFont atlas is 32px. The bundled DejaVu Sans renders heavier than
     /// the system font the MonoGame build used, so scale below the nominal
     /// 24/32 for a matching visual size.
+    [<Literal>]
     let uiScale = 0.5f
 
     /// 1x1 white pixel, assigned in CardRenderer.loadAll. fillRect is
@@ -40,7 +41,8 @@ module Render =
     let LTableOverlay = 12<RenderLayer>
     let LHandBack     = 20<RenderLayer>
     let LHand         = 25<RenderLayer>
-    let LHandTop      = 27<RenderLayer>   // dragged / lifted card above the rest
+    /// dragged / lifted card above the rest
+    let LHandTop      = 27<RenderLayer>
     let LLabel        = 30<RenderLayer>
     let LButton       = 40<RenderLayer>
     let LButtonBorder = 41<RenderLayer>
