@@ -1140,8 +1140,10 @@ module GameScreen =
         let deckIconH = ch / 2
         let deckIconX = scoreX
         let deckIconY = infoY + 26
-        Gfx.drawImage g textures.Back deckIconX deckIconY deckIconW deckIconH
-        Gfx.fillText g (string deckCount) (float (deckIconX + deckIconW + 6)) (float (deckIconY + 4)) Color.LightGray
+        // no deck image once the last wave has been drawn (nothing left to draw)
+        if deckCount > 0 then
+            Gfx.drawImage g textures.Back deckIconX deckIconY deckIconW deckIconH
+            Gfx.fillText g (string deckCount) (float (deckIconX + deckIconW + 6)) (float (deckIconY + 4)) Color.LightGray
 
         // ── Help / layout / menu buttons (hidden during modal) ──
         match screen.Phase with
@@ -1155,9 +1157,9 @@ module GameScreen =
             // one line per recent play (captures and placements)
             if screen.ShowRecentPlays then
                 let lines = GameEngine.describeRecentPlays gs
-                // larger text in mobile mode; the panel grows to fit its widest line
+                // larger text than the status lines; the panel grows to fit its widest line
                 let baseFont = g.FontSize
-                if CardRenderer.UiScale > 1.0 then g.FontSize <- int (float baseFont * 1.4)
+                g.FontSize <- int (float baseFont * 1.4)
                 let lineH = g.FontSize + 2
                 let widest = lines |> List.map (fun l -> (Gfx.measure g l).X) |> List.max
                 let panelW = min (screenW - 40) (max 640 (int widest + 20))

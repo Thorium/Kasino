@@ -70,7 +70,10 @@ module ScoreScreen =
         // Mobile mode: larger text, with the row pitch and column positions
         // following the font so the table stays legible.
         let baseFont = g.FontSize
-        if CardRenderer.UiScale > 1.0 then g.FontSize <- int (float baseFont * 1.4)
+        if CardRenderer.UiScale > 1.0 then
+            // 1.4x, reduced so header + table + winner line still clear the button
+            let fit = (float screenH - 320.0) / (14.0 * float baseFont)
+            g.FontSize <- int (float baseFont * max 1.0 (min 1.4 fit))
         let fs = g.FontSize
         let rowH = fs + 4
         let drawCentered (text: string) (y: int) (color: Color) =
@@ -105,13 +108,16 @@ module ScoreScreen =
         let colStart = catX + int widestCat + 40
         let blockH = rowH * (categories.Length + 1) + 24
 
-        // Mobile mode with 3-4 players: two blocks of two players (each with
-        // its own category column) instead of four cramped columns, as long
-        // as both blocks fit above the button; otherwise one block.
+        // 3-4 players: two blocks of two players (each with its own category
+        // column) instead of cramped columns, whenever the columns would be
+        // narrower than the widest name needs (always the case in mobile mode)
+        // and both blocks fit above the button; otherwise one block.
         let blocks =
             let n = state.Scores.Length
             let twoBlocksFit = startY + 2 * blockH + 60 <= screenH - int (100.0 * CardRenderer.UiScale)
-            if CardRenderer.UiScale > 1.0 && n > 2 && twoBlocksFit then List.chunkBySize 2 state.Scores
+            let widestName = state.Scores |> List.map (fun (p, _) -> (Gfx.measure g p.Name).X) |> List.max
+            let tooNarrow = float ((screenW - colStart - 20) / max 1 n) < widestName + 40.0
+            if n > 2 && twoBlocksFit && (CardRenderer.UiScale > 1.0 || tooNarrow) then List.chunkBySize 2 state.Scores
             else [ state.Scores ]
 
         blocks

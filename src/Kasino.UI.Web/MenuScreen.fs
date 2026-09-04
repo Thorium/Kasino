@@ -30,12 +30,18 @@ module MenuScreen =
           HumanCount = 1 }
 
     // ── Button definitions (recomputed each frame) ──────────
-    // Everything scales with CardRenderer.UiScale (about 1.8 on touch devices).
-    let private S (v: int) = int (float v * CardRenderer.UiScale)
+    // Everything scales with the menu scale: CardRenderer.UiScale (about 1.8
+    // on touch devices) reduced when the height is too small for the button
+    // stacks not to collide (landscape phones). Set from screenH each frame.
+    let mutable private scale = 1.0
+    let private fitScale (screenH: int) =
+        // stacked pair + fan + Options/How to Play must fit: 260 + 408*s <= screenH
+        max 1.0 (min CardRenderer.UiScale (float (screenH - 260) / 408.0))
+    let private S (v: int) = int (float v * scale)
     /// Button height: a little taller than plain scaling in mobile mode.
-    let private BH () = if CardRenderer.UiScale > 1.0 then S 60 else 52
+    let private BH () = if scale > 1.0 then S 60 else 52
     /// Vertical step between two stacked buttons (height + a gap).
-    let private step () = BH () + (if CardRenderer.UiScale > 1.0 then S 44 else 12)
+    let private step () = BH () + (if scale > 1.0 then S 44 else 12)
 
     let private variantButtons (screenW: int) =
         [ Button.createCentered "Standard Kasino (maximize)" screenW 200 (S 360) (BH ()) (Color.rgb 40 100 40) Color.White
@@ -64,6 +70,7 @@ module MenuScreen =
 
     /// Advance menu based on input (touch buttons + keyboard fallback).
     let update (input: Input.InputState) (screenW: int) (screenH: int) (state: MenuState) =
+        scale <- fitScale screenH
         let helpBtn = howToPlayButton screenW screenH
         let optBtn = optionsButton screenW screenH
         if Button.isClicked input helpBtn then
@@ -108,6 +115,7 @@ module MenuScreen =
 
     /// Draw menu screen with tappable buttons.
     let draw (g: Gfx) (texOpt: CardRenderer.CardTextures option) (input: Input.InputState) (state: MenuState) (screenW: int) (screenH: int) =
+        scale <- fitScale screenH
         let cx = float (screenW / 2)
         let drawCentered (text: string) (y: int) (color: Color) =
             let size = Gfx.measure g text
@@ -126,7 +134,8 @@ module MenuScreen =
                 Gfx.drawImageRotated g (CardRenderer.getTexture tex card) x y w h rot
             let bandTop = 220 + step () + BH ()                   // below the tallest button set
             let bandBottom = screenH - S 80 - step ()             // top of the Options button
-            let fanH = min (S 76) (int (float (bandBottom - bandTop) * 0.85))
+            // the fanned, tilted cards reach beyond fanH, so take only part of the band
+            let fanH = min (S 76) (int (float (bandBottom - bandTop) * 0.6))
             let fanW = fanH * 60 / 76
             let fanY = float ((bandTop + bandBottom) / 2)         // midpoint of the empty band
             let acesFan = [ Spades, -0.30; Hearts, -0.10; Diamonds, 0.10; Clubs, 0.30 ]
@@ -139,7 +148,7 @@ module MenuScreen =
         // UiScale, keeping the prompt texts at their normal size.
         let drawButtons (buttons: Button.ButtonDef list) =
             let baseFont = g.FontSize
-            g.FontSize <- int (float baseFont * CardRenderer.UiScale)
+            g.FontSize <- int (float baseFont * scale)
             Button.drawAll g input buttons
             g.FontSize <- baseFont
 

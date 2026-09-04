@@ -71,6 +71,8 @@ type KasinoGame() as this =
     let mutable fontSystem: FontSystem = Unchecked.defaultof<_>
     let mutable font: SpriteFontBase = Unchecked.defaultof<_>
     let mutable fontSmall: SpriteFontBase = Unchecked.defaultof<_>
+    /// larger face for the recent-moves panel
+    let mutable fontLarge: SpriteFontBase = Unchecked.defaultof<_>
     let mutable textures: CardRenderer.CardTextures option = None
     /// Every deck style, loaded once; `textures` is the one the settings select.
     let mutable decks: Map<Settings.CardStyle, CardRenderer.CardTextures> = Map.empty
@@ -154,6 +156,7 @@ type KasinoGame() as this =
 
         font <- fontSystem.GetFont 24.0f
         fontSmall <- fontSystem.GetFont 18.0f
+        fontLarge <- fontSystem.GetFont 32.0f
 
         // Load card textures
         let contentDir = Path.Combine(AppContext.BaseDirectory, "Content")
@@ -340,7 +343,7 @@ type KasinoGame() as this =
             // The menu's ace fan always shows the original deck, whatever the card style.
             MenuScreen.draw spriteBatch font (Map.tryFind Settings.Realistic decks) lastInput menuState (screenW()) (screenH())
         | Playing gameState, Some tex ->
-            GameScreen.draw spriteBatch font lastInput tex gameState (screenW()) (screenH())
+            GameScreen.draw spriteBatch font fontLarge lastInput tex gameState (screenW()) (screenH())
         | Scores scoreState, _ ->
             ScoreScreen.draw spriteBatch font lastInput scoreState (screenW()) (screenH())
         | Rules (rulesState, _), texOpt ->

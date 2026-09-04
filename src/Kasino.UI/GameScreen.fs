@@ -980,7 +980,7 @@ module GameScreen =
         let text = $"{player.Name}  Cards:{List.length player.CapturedCards}  Sweeps:{player.Sweeps}"
         sb.DrawString(font, text, Vector2(float32 x, float32 y), color) |> ignore
 
-    let draw (sb: SpriteBatch) (font: SpriteFontBase) (input: InputHandler.InputState) (textures: CardRenderer.CardTextures) (screen: ScreenState) (screenW: int) (screenH: int) =
+    let draw (sb: SpriteBatch) (font: SpriteFontBase) (fontLarge: SpriteFontBase) (input: InputHandler.InputState) (textures: CardRenderer.CardTextures) (screen: ScreenState) (screenW: int) (screenH: int) =
         let gs = screen.GameState
         let cw = CardRenderer.scaledWidth()
         let ch = CardRenderer.scaledHeight()
@@ -1216,9 +1216,11 @@ module GameScreen =
         let deckIconH = ch / 2
         let deckIconX = scoreX
         let deckIconY = infoY + 26
-        sb.Draw(textures.Back, Rectangle(deckIconX, deckIconY, deckIconW, deckIconH), Color.White)
-        let deckText = $"{deckCount}"
-        sb.DrawString(font, deckText, Vector2(float32 (deckIconX + deckIconW + 6), float32 (deckIconY + 4)), Color.LightGray) |> ignore
+        // no deck image once the last wave has been drawn (nothing left to draw)
+        if deckCount > 0 then
+            sb.Draw(textures.Back, Rectangle(deckIconX, deckIconY, deckIconW, deckIconH), Color.White)
+            let deckText = $"{deckCount}"
+            sb.DrawString(font, deckText, Vector2(float32 (deckIconX + deckIconW + 6), float32 (deckIconY + 4)), Color.LightGray) |> ignore
 
         // ── "?" help button, layout toggle, and Menu button (shown when not in modal) ──
         match screen.Phase with
@@ -1232,12 +1234,15 @@ module GameScreen =
             // one line per recent play (captures and placements)
             if screen.ShowRecentPlays then
                 let lines = GameEngine.describeRecentPlays gs
-                let lineH = 26
-                let panel = Rectangle(20, 76, 640, lineH * lines.Length + 12)
+                // larger font than the status lines; the panel fits its widest line
+                let lineH = 38
+                let widest = lines |> List.map (fun l -> (fontLarge.MeasureString l).X) |> List.max
+                let panelW = min (screenW - 40) (max 640 (int widest + 24))
+                let panel = Rectangle(20, 76, panelW, lineH * lines.Length + 14)
                 let whiteTex = CardRenderer.getCachedColorTexture sb.GraphicsDevice Color.White
                 sb.Draw(whiteTex, panel, Color(0, 0, 0, 230))
                 lines |> List.iteri (fun i line ->
-                    sb.DrawString(font, line, Vector2(30.0f, float32 (82 + i * lineH)), Color.Gold) |> ignore)
+                    sb.DrawString(fontLarge, line, Vector2(32.0f, float32 (84 + i * lineH)), Color.Gold) |> ignore)
 
         // ── Shuffle animation (riffle shuffle, drawn on top of table) ──
         match screen.Phase with

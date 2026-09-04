@@ -96,11 +96,16 @@ module OptionsScreen =
             let w, h = S 120, S 152
             let rowsBottom = RowsTop + 5 * S RowStep + S RowH
             let rowsRight = screenW / 2 + S RowW / 2
-            let x0, y0 =
+            // beside the rows when it fits; otherwise below them, shrunk if the
+            // room above the Back button is short (landscape tablets)
+            let w, h, x0, y0 =
                 if rowsRight + 30 + 2 * w + 12 <= screenW - 10 then
-                    rowsRight + 30, RowsTop + (rowsBottom - RowsTop - h) / 2
+                    w, h, rowsRight + 30, RowsTop + (rowsBottom - RowsTop - h) / 2
                 else
-                    (screenW - (2 * w + 12)) / 2, rowsBottom + 46
+                    let room = screenH - S 100 - (rowsBottom + 46)
+                    let h = max 40 (min h room)
+                    let w = h * 120 / 152
+                    w, h, (screenW - (2 * w + 12)) / 2, rowsBottom + 46
             let size = Gfx.measure g "Preview"
             Gfx.fillText g "Preview" (float (x0 + w + 6) - size.X / 2.0) (float (y0 - 34)) Color.LightGray
             for i, card in List.indexed [ { Suit = Diamonds; Rank = Ten }; { Suit = Spades; Rank = Two } ] do
