@@ -100,40 +100,53 @@ module ScoreScreen =
               "─────────────"; "Round total"; ""; "Cumulative" ]
 
         let catX = 20
-        for i in 0 .. categories.Length - 1 do
-            let y = startY + rowH + i * rowH
-            drawLeft categories[i] catX y Color.LightGray
-
         // player columns start after the widest category label
         let widestCat = categories |> List.map (fun c -> (Gfx.measure g c).X) |> List.max
         let colStart = catX + int widestCat + 40
-        let colW = (screenW - colStart - 20) / max 1 state.Scores.Length
+        let blockH = rowH * (categories.Length + 1) + 24
 
-        state.Scores
-        |> List.iteri (fun col (player, breakdown) ->
-            let x = colStart + col * colW
-            drawLeft player.Name x startY Color.White
+        // Mobile mode with 3-4 players: two blocks of two players (each with
+        // its own category column) instead of four cramped columns, as long
+        // as both blocks fit above the button; otherwise one block.
+        let blocks =
+            let n = state.Scores.Length
+            let twoBlocksFit = startY + 2 * blockH + 60 <= screenH - int (100.0 * CardRenderer.UiScale)
+            if CardRenderer.UiScale > 1.0 && n > 2 && twoBlocksFit then List.chunkBySize 2 state.Scores
+            else [ state.Scores ]
 
-            let rows =
-                [ string breakdown.MostCards
-                  string breakdown.MostSpades
-                  string breakdown.Aces
-                  string breakdown.DiamondTen
-                  string breakdown.SpadeTwo
-                  string breakdown.Sweeps
-                  ""
-                  string breakdown.Total
-                  ""
-                  string (state.CumulativeScores |> Map.tryFind player.Name |> Option.defaultValue 0) ]
+        blocks
+        |> List.iteri (fun bi block ->
+            let top = startY + bi * blockH
+            for i in 0 .. categories.Length - 1 do
+                drawLeft categories[i] catX (top + rowH + i * rowH) Color.LightGray
+            let colW = (screenW - colStart - 20) / max 1 block.Length
+            block
+            |> List.iteri (fun col (player, breakdown) ->
+                let x = colStart + col * colW
+                drawLeft player.Name x top Color.White
 
-            for i in 0 .. rows.Length - 1 do
-                let y = startY + rowH + i * rowH
-                let color =
-                    match i with
-                    | 7 -> Color.Yellow
-                    | 9 -> Color.Gold
-                    | _ -> Color.White
-                drawLeft rows[i] x y color)
+                let rows =
+                    [ string breakdown.MostCards
+                      string breakdown.MostSpades
+                      string breakdown.Aces
+                      string breakdown.DiamondTen
+                      string breakdown.SpadeTwo
+                      string breakdown.Sweeps
+                      ""
+                      string breakdown.Total
+                      ""
+                      string (state.CumulativeScores |> Map.tryFind player.Name |> Option.defaultValue 0) ]
+
+                for i in 0 .. rows.Length - 1 do
+                    let y = top + rowH + i * rowH
+                    let color =
+                        match i with
+                        | 7 -> Color.Yellow
+                        | 9 -> Color.Gold
+                        | _ -> Color.White
+                    drawLeft rows[i] x y color))
+
+        let tableBottom = startY + (blocks.Length - 1) * blockH + rowH + categories.Length * rowH
 
         // Winner announcement. An exact tie for the deciding score names
         // every tied player rather than an arbitrary one.
@@ -145,7 +158,7 @@ module ScoreScreen =
                 | StandardKasino -> scores |> List.map snd |> List.max
                 | LaistoKasino   -> scores |> List.map snd |> List.min
             let winners = scores |> List.filter (fun (_, s) -> s = bestScore) |> List.map fst
-            let winnerY = startY + rowH + categories.Length * rowH + 20
+            let winnerY = tableBottom + 20
             let text =
                 match winners with
                 | [ w ] -> $"%s{w} wins with %d{bestScore} points!"

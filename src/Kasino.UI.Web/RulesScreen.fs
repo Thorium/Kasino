@@ -163,7 +163,9 @@ module RulesScreen =
 
     let private prevButton (screenW: int) (screenH: int) =
         let cx = screenW / 2
-        Button.create "Previous" (cx - S 250) (screenH - S 70) (S 160) (S 52) (Color.rgb 60 60 100) Color.White
+        // never left of the (scaled) Back button's right edge
+        let x = max (cx - S 250) (20 + S 140 + 24)
+        Button.create "Previous" x (screenH - S 70) (S 160) (S 52) (Color.rgb 60 60 100) Color.White
 
     let private nextButton (screenW: int) (screenH: int) =
         let cx = screenW / 2
