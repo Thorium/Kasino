@@ -27,7 +27,8 @@ module ScoreScreen =
     let private actionButton (screenW: int) (screenH: int) (phase: ScorePhase) =
         let label = match phase with RoundSummary -> "Next Round" | GameOver -> "Back to Menu"
         let color = match phase with RoundSummary -> Color.rgb 40 80 140 | GameOver -> Color.rgb 140 80 40
-        Button.createCentered label screenW (screenH - 80) 220 52 color Color.White
+        let s = CardRenderer.UiScale
+        Button.createCentered label screenW (screenH - int (80.0 * s)) (int (220.0 * s)) (int (60.0 * s)) color Color.White
 
     /// Create score state from round results.
     let create
@@ -66,6 +67,12 @@ module ScoreScreen =
 
     let draw (g: Gfx) (input: Input.InputState) (state: ScoreState) (screenW: int) (screenH: int) =
         let cx = float (screenW / 2)
+        // Mobile mode: larger text, with the row pitch and column positions
+        // following the font so the table stays legible.
+        let baseFont = g.FontSize
+        if CardRenderer.UiScale > 1.0 then g.FontSize <- int (float baseFont * 1.4)
+        let fs = g.FontSize
+        let rowH = fs + 4
         let drawCentered (text: string) (y: int) (color: Color) =
             let size = Gfx.measure g text
             Gfx.fillText g text (cx - size.X / 2.0) (float y) color
@@ -78,15 +85,14 @@ module ScoreScreen =
             | GameOver -> "Game Over!"
         drawCentered title 30 Color.Gold
 
+
         let varName =
             match state.Variant with
             | StandardKasino -> "Standard Kasino"
             | LaistoKasino -> "Laistokasino"
-        drawCentered varName 60 Color.Gray
+        drawCentered varName (30 + fs + 6) Color.Gray
 
-        let startY = 100
-        let colX = 60
-        let colW = (screenW - 120) / max 1 state.Scores.Length
+        let startY = 30 + 2 * fs + 24
 
         let categories =
             [ "Most cards (1pt)"; "Most spades (2pts)"; "Aces (1pt each)"
@@ -95,12 +101,17 @@ module ScoreScreen =
 
         let catX = 20
         for i in 0 .. categories.Length - 1 do
-            let y = startY + 30 + i * 24
+            let y = startY + rowH + i * rowH
             drawLeft categories[i] catX y Color.LightGray
+
+        // player columns start after the widest category label
+        let widestCat = categories |> List.map (fun c -> (Gfx.measure g c).X) |> List.max
+        let colStart = catX + int widestCat + 40
+        let colW = (screenW - colStart - 20) / max 1 state.Scores.Length
 
         state.Scores
         |> List.iteri (fun col (player, breakdown) ->
-            let x = colX + 200 + col * colW
+            let x = colStart + col * colW
             drawLeft player.Name x startY Color.White
 
             let rows =
@@ -116,7 +127,7 @@ module ScoreScreen =
                   string (state.CumulativeScores |> Map.tryFind player.Name |> Option.defaultValue 0) ]
 
             for i in 0 .. rows.Length - 1 do
-                let y = startY + 30 + i * 24
+                let y = startY + rowH + i * rowH
                 let color =
                     match i with
                     | 7 -> Color.Yellow
@@ -134,7 +145,7 @@ module ScoreScreen =
                 | StandardKasino -> scores |> List.map snd |> List.max
                 | LaistoKasino   -> scores |> List.map snd |> List.min
             let winners = scores |> List.filter (fun (_, s) -> s = bestScore) |> List.map fst
-            let winnerY = startY + 30 + categories.Length * 24 + 20
+            let winnerY = startY + rowH + categories.Length * rowH + 20
             let text =
                 match winners with
                 | [ w ] -> $"%s{w} wins with %d{bestScore} points!"
@@ -143,3 +154,4 @@ module ScoreScreen =
         | RoundSummary -> ()
 
         Button.draw g input (actionButton screenW screenH state.Phase)
+        g.FontSize <- baseFont

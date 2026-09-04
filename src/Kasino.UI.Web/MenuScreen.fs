@@ -35,7 +35,7 @@ module MenuScreen =
     /// Button height: a little taller than plain scaling in mobile mode.
     let private BH () = if CardRenderer.UiScale > 1.0 then S 60 else 52
     /// Vertical step between two stacked buttons (height + a gap).
-    let private step () = BH () + (if CardRenderer.UiScale > 1.0 then S 20 else 12)
+    let private step () = BH () + (if CardRenderer.UiScale > 1.0 then S 44 else 12)
 
     let private variantButtons (screenW: int) =
         [ Button.createCentered "Standard Kasino (maximize)" screenW 200 (S 360) (BH ()) (Color.rgb 40 100 40) Color.White

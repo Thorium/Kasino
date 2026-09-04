@@ -1155,10 +1155,16 @@ module GameScreen =
             // one line per recent play (captures and placements)
             if screen.ShowRecentPlays then
                 let lines = GameEngine.describeRecentPlays gs
+                // larger text in mobile mode; the panel grows to fit its widest line
+                let baseFont = g.FontSize
+                if CardRenderer.UiScale > 1.0 then g.FontSize <- int (float baseFont * 1.4)
                 let lineH = g.FontSize + 2
-                Gfx.fillRect g { X = 20; Y = 76; Width = 640; Height = lineH * lines.Length + 12 } (Color.rgba 0 0 0 230)
+                let widest = lines |> List.map (fun l -> (Gfx.measure g l).X) |> List.max
+                let panelW = min (screenW - 40) (max 640 (int widest + 20))
+                Gfx.fillRect g { X = 20; Y = 76; Width = panelW; Height = lineH * lines.Length + 12 } (Color.rgba 0 0 0 230)
                 lines |> List.iteri (fun i line ->
                     Gfx.fillText g line 30.0 (float (82 + i * lineH)) Color.Gold)
+                g.FontSize <- baseFont
 
         // ── Shuffle animation (riffle) ──
         match screen.Phase with

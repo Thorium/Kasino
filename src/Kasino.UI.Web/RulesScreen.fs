@@ -156,16 +156,18 @@ module RulesScreen =
         | VisualPage(t, _) -> t
 
     // ── Button helpers ──────────────────────────────────
+    let private S (v: int) = int (float v * CardRenderer.UiScale)
+
     let private backButton (_screenW: int) (screenH: int) =
-        Button.create "Back" 20 (screenH - 70) 140 52 (Color.rgb 120 40 40) Color.White
+        Button.create "Back" 20 (screenH - S 70) (S 140) (S 52) (Color.rgb 120 40 40) Color.White
 
     let private prevButton (screenW: int) (screenH: int) =
         let cx = screenW / 2
-        Button.create "Previous" (cx - 250) (screenH - 70) 160 52 (Color.rgb 60 60 100) Color.White
+        Button.create "Previous" (cx - S 250) (screenH - S 70) (S 160) (S 52) (Color.rgb 60 60 100) Color.White
 
     let private nextButton (screenW: int) (screenH: int) =
         let cx = screenW / 2
-        Button.create "Next" (cx + 90) (screenH - 70) 160 52 (Color.rgb 40 100 40) Color.White
+        Button.create "Next" (cx + S 90) (screenH - S 70) (S 160) (S 52) (Color.rgb 40 100 40) Color.White
 
     // ── Visual-page drawing helpers ─────────────────────
     [<Literal>]
@@ -266,17 +268,29 @@ module RulesScreen =
             let size = Gfx.measure g text
             Gfx.fillText g text (cx - size.X / 2.0) (float y) color
 
+        // header lines stack by font size (the base font is larger in mobile mode)
+        let fs = g.FontSize
         drawCentered "How to Play Kasino" 20 Color.Gold
-        drawCentered (pageTitle state.CurrentPage) 55 Color.White
-        drawCentered (sprintf "Page %d / %d" (state.CurrentPage + 1) totalPages) 80 Color.Gray
+        drawCentered (pageTitle state.CurrentPage) (20 + fs + 8) Color.White
+        drawCentered (sprintf "Page %d / %d" (state.CurrentPage + 1) totalPages) (20 + 2 * fs + 10) Color.Gray
 
         // Separator line
-        Gfx.fillRect g { X = 40; Y = 100; Width = screenW - 80; Height = 1 } Color.DarkGray
+        let sepY = 20 + 3 * fs + 14
+        Gfx.fillRect g { X = 40; Y = sepY; Width = screenW - 80; Height = 1 } Color.DarkGray
 
         match pages.[state.CurrentPage] with
         | TextPage(_, lines) ->
-            let lineH = g.FontSize - 2
-            let startY = 115
+            // Mobile mode: up to 1.5x text, limited so the page's longest line
+            // still fits the width and all its lines fit above the buttons.
+            let baseFont = g.FontSize
+            if CardRenderer.UiScale > 1.0 then
+                let widest = lines |> List.map (fun l -> (Gfx.measure g l).X) |> List.max |> max 1.0
+                let byWidth = float (screenW - 100) / widest
+                let byHeight = float (screenH - sepY - 15 - S 90) / float (lines.Length * (baseFont + 4))
+                g.FontSize <- int (float baseFont * (min 1.5 (min byWidth byHeight)))
+            // a roomier line pitch in mobile mode, the classic tight one on desktop
+            let lineH = if CardRenderer.UiScale > 1.0 then g.FontSize + 4 else g.FontSize - 2
+            let startY = sepY + 15
             for i in 0 .. lines.Length - 1 do
                 let line = lines[i]
                 let y = startY + i * lineH
@@ -285,14 +299,18 @@ module RulesScreen =
                     elif line = "" then Color.Transparent
                     else Color.White
                 Gfx.fillText g line 50.0 (float y) color
+            g.FontSize <- baseFont
         | VisualPage(_, vid) ->
             match texOpt with
             | Some tex -> drawVisual g tex cx vid
             | None -> drawCentered "Loading cards..." 300 Color.Gray
 
-        // Navigation buttons
+        // Navigation buttons (labels scaled like the menu buttons in mobile mode)
+        let baseFont = g.FontSize
+        g.FontSize <- int (float baseFont * CardRenderer.UiScale)
         Button.draw g input (backButton screenW screenH)
         if state.CurrentPage > 0 then Button.draw g input (prevButton screenW screenH)
         if state.CurrentPage < totalPages - 1 then Button.draw g input (nextButton screenW screenH)
+        g.FontSize <- baseFont
 
         drawCentered "Arrow keys: navigate  |  Esc: back" (screenH - 20) Color.DarkGray
