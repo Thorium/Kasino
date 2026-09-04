@@ -82,6 +82,11 @@ module Render =
         let st = TextState.create(font, s, pos)
         buffer.text({ st with Color = color; Scale = uiScale; Layer = layer }) |> ignore
 
+    /// Draw text at a multiple of the normal UI size (e.g. 1.3 for emphasis).
+    let textScaled (buffer: RenderBuffer2D) (layer: int<RenderLayer>) (font: SpriteFont) (s: string) (pos: Vector2) (color: Color) (factor: float32) =
+        let st = TextState.create(font, s, pos)
+        buffer.text({ st with Color = color; Scale = uiScale * factor; Layer = layer }) |> ignore
+
     /// Draw text horizontally centered on `cx`.
     let textCentered (buffer: RenderBuffer2D) (layer: int<RenderLayer>) (font: SpriteFont) (s: string) (cx: float32) (y: float32) (color: Color) =
         let size = measure font s

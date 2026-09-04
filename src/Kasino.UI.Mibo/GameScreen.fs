@@ -1086,8 +1086,10 @@ module GameScreen =
         let deckIconH = ch / 2
         let deckIconX = scoreX
         let deckIconY = infoY + 26
-        Render.sprite buffer Render.LHand textures.Back (Rectangle(deckIconX, deckIconY, deckIconW, deckIconH))
-        Render.text buffer Render.LLabel font $"{deckCount}" (Vector2(float32 (deckIconX + deckIconW + 6), float32 (deckIconY + 4))) Color.LightGray
+        // no deck image once the last wave has been drawn (nothing left to draw)
+        if deckCount > 0 then
+            Render.sprite buffer Render.LHand textures.Back (Rectangle(deckIconX, deckIconY, deckIconW, deckIconH))
+            Render.text buffer Render.LLabel font $"{deckCount}" (Vector2(float32 (deckIconX + deckIconW + 6), float32 (deckIconY + 4))) Color.LightGray
 
         // "?" help button, layout toggle, and Menu button (hidden in modal)
         match screen.Phase with
@@ -1101,10 +1103,14 @@ module GameScreen =
             // one line per recent play (captures and placements)
             if screen.ShowRecentPlays then
                 let lines = GameEngine.describeRecentPlays gs
-                let lineH = 26
-                Render.fill buffer Render.LOverlayBg (Color(0, 0, 0, 230)) (Rectangle(20, 76, 640, lineH * lines.Length + 12))
+                // larger text than the status lines; the panel fits its widest line
+                let factor = 1.35f
+                let lineH = 36
+                let widest = lines |> List.map (fun l -> (Render.measure font l).X * factor) |> List.max
+                let panelW = min (screenW - 40) (max 640 (int widest + 24))
+                Render.fill buffer Render.LOverlayBg (Color(0, 0, 0, 230)) (Rectangle(20, 76, panelW, lineH * lines.Length + 14))
                 lines |> List.iteri (fun i line ->
-                    Render.text buffer Render.LModalText font line (Vector2(30.0f, float32 (82 + i * lineH))) Color.Gold)
+                    Render.textScaled buffer Render.LModalText font line (Vector2(32.0f, float32 (84 + i * lineH))) Color.Gold factor)
 
         // Shuffle animation (riffle shuffle)
         match screen.Phase with
