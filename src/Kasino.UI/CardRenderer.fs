@@ -8,7 +8,8 @@ open Kasino.Domain
 
 // ─────────────────────────────────────────────────────────────
 // Card texture loading and rendering utilities.
-// Card images: 75x95 px PNGs, named by suit prefix + rank.
+// Card images: 75x95 px PNGs, named by suit prefix + rank, one folder per
+// deck style (Content/cards/screen, Content/cards/realistic).
 //   sp=Spades, he=Hearts, di=Diamonds, cl=Clubs
 //   1=Ace, 2-10, j=Jack, q=Queen, k=King
 // ─────────────────────────────────────────────────────────────
@@ -54,9 +55,10 @@ module CardRenderer =
     /// All card textures keyed by (Suit, Rank)
     type CardTextures =
         { Cards: Map<Suit * Rank, Texture2D>
-          mutable Back: Texture2D  // currently active deck image (one of Backs)
-          HandBack: Texture2D      // single card back for face-down hand cards
-          Backs: Texture2D[]       // available deck designs (scenic photos with stacked edges)
+          mutable Back: Texture2D      // currently active deck image (one of Backs)
+          mutable HandBack: Texture2D  // single card back for face-down hand cards (matches Back)
+          Backs: Texture2D[]           // available deck designs (scenic photos with stacked edges)
+          HandBacks: Texture2D[]       // the single-card back of each design (parallel to Backs)
           Highlight: Texture2D     // yellow highlight border
           TableBg: Texture2D }     // green felt
 
@@ -178,9 +180,10 @@ module CardRenderer =
         tex.SetData pixels
         tex
 
-    /// Load all card textures from the Content/cards directory
-    let loadAll (device: GraphicsDevice) (contentDir: string) : CardTextures =
-        let cardsDir = Path.Combine(contentDir, "cards")
+    /// Load the card textures of one deck style from Content/cards/<style>/
+    /// (table_bg.png is shared by the styles and sits in Content/cards/).
+    let loadAll (device: GraphicsDevice) (contentDir: string) (style: Settings.CardStyle) : CardTextures =
+        let cardsDir = Path.Combine(contentDir, "cards", Settings.CardStyle.folder style)
 
         let cardMap =
             [ for suit in Cards.allSuits do
@@ -191,26 +194,31 @@ module CardRenderer =
                         yield ((suit, rank), loadTexture device path) ]
             |> Map.ofList
 
-        // Scenic card backs (back1.png, back2.png, …) carried over from the
-        // original 2002 deck. One is chosen at random per game; if none are
-        // present we fall back to back.png or the procedural pattern.
-        let scenicBacks =
-            [ 1 .. 9 ]
-            |> List.choose (fun i ->
-                let p = Path.Combine(cardsDir, $"back%d{i}.png")
-                if File.Exists(p) then Some(loadTexture device p) else None)
-
         let defaultBack =
             let backPath = Path.Combine(cardsDir, "back.png")
             if File.Exists(backPath) then loadTexture device backPath
             else generateCardBack device
 
-        let backs =
-            match scenicBacks with
-            | [] -> [| defaultBack |]
-            | xs -> List.toArray xs
+        // Scenic deck designs (back1.png, back2.png, …) carried over from the
+        // original 2002 deck, each with its single-card hand back
+        // (handback1.png, …; back.png stands in when one is missing). One design
+        // is chosen per game; with none present we fall back to back.png or
+        // the procedural pattern for both.
+        let scenicBacks =
+            [ 1 .. 9 ]
+            |> List.choose (fun i ->
+                let pile = Path.Combine(cardsDir, $"back%d{i}.png")
+                let single = Path.Combine(cardsDir, $"handback%d{i}.png")
+                if File.Exists(pile) then
+                    Some(loadTexture device pile, (if File.Exists(single) then loadTexture device single else defaultBack))
+                else None)
 
-        let tableBgPath = Path.Combine(cardsDir, "table_bg.png")
+        let backs, handBacks =
+            match scenicBacks with
+            | [] -> [| defaultBack |], [| defaultBack |]
+            | xs -> List.map fst xs |> List.toArray, List.map snd xs |> List.toArray
+
+        let tableBgPath = Path.Combine(contentDir, "cards", "table_bg.png")
         let tableBg =
             if File.Exists(tableBgPath) then loadTexture device tableBgPath
             else generateFeltTexture device
@@ -218,13 +226,27 @@ module CardRenderer =
         let highlight = createColorTexture device (Color(255, 255, 0, 128))
 
         // The scenic backN images are deck-pile art (stacked edges baked in);
-        // face-down cards in hands always use the plain single-card back.
-        { Cards = cardMap; Back = backs[0]; HandBack = defaultBack; Backs = backs; Highlight = highlight; TableBg = tableBg }
+        // face-down cards in hands use the matching plain single-card back.
+        { Cards = cardMap; Back = backs[0]; HandBack = handBacks[0]; Backs = backs; HandBacks = handBacks; Highlight = highlight; TableBg = tableBg }
 
-    /// Pick a random card back for the next game/round (mutates the active Back).
+    /// Load every deck style up front (a deck is 56 small PNGs) so the
+    /// Options screen can preview and switch styles without reloading.
+    let loadDecks (device: GraphicsDevice) (contentDir: string) : Map<Settings.CardStyle, CardTextures> =
+        Settings.CardStyle.all
+        |> List.map (fun style -> style, loadAll device contentDir style)
+        |> Map.ofList
+
+    /// Select deck design i for the game: deck pile and hand back together.
+    let selectBack (i: int) (textures: CardTextures) =
+        if textures.Backs.Length > 0 then
+            let i = ((i % textures.Backs.Length) + textures.Backs.Length) % textures.Backs.Length
+            textures.Back <- textures.Backs[i]
+            textures.HandBack <- textures.HandBacks[i]
+
+    /// Pick a random deck design for the next game (mutates Back and HandBack).
     let pickRandomBack (rng: Random) (textures: CardTextures) =
         if textures.Backs.Length > 0 then
-            textures.Back <- textures.Backs[rng.Next textures.Backs.Length]
+            selectBack (rng.Next textures.Backs.Length) textures
 
     /// Get the texture for a specific card (fallback to the card back if missing)
     let getTexture (textures: CardTextures) (card: Card) =

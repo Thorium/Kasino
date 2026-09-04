@@ -51,7 +51,7 @@ let ``allHandsEmpty should return true when all hands empty`` () =
     let state: GameEngine.GameState =
         { Players = players; Table = []; Deck = []
           CurrentPlayerIndex = 0; DealRound = 1; TotalDeals = 6
-          LastCapturer = None; Variant = StandardKasino; SweepsFrozen = false }
+          LastCapturer = None; RecentPlays = []; Variant = StandardKasino; SweepsFrozen = false }
     Assert.True(GameEngine.allHandsEmpty state)
 
 [<Fact>]
@@ -64,7 +64,7 @@ let ``allHandsEmpty should return false when any hand has cards`` () =
     let state: GameEngine.GameState =
         { Players = players; Table = []; Deck = []
           CurrentPlayerIndex = 0; DealRound = 1; TotalDeals = 6
-          LastCapturer = None; Variant = StandardKasino; SweepsFrozen = false }
+          LastCapturer = None; RecentPlays = []; Variant = StandardKasino; SweepsFrozen = false }
     Assert.False(GameEngine.allHandsEmpty state)
 
 [<Fact>]
@@ -126,7 +126,7 @@ let ``endRound should give remaining table cards to last capturer`` () =
     let state: GameEngine.GameState =
         { Players = players; Table = table; Deck = []
           CurrentPlayerIndex = 0; DealRound = 6; TotalDeals = 6
-          LastCapturer = Some 0; Variant = StandardKasino; SweepsFrozen = false }
+          LastCapturer = Some 0; RecentPlays = []; Variant = StandardKasino; SweepsFrozen = false }
     let final = GameEngine.endRound state
     Assert.Equal(3, final.Players[0].CapturedCards.Length)
     Assert.Empty(final.Table)
@@ -140,7 +140,7 @@ let ``endRound with no last capturer should leave table unchanged`` () =
     let state: GameEngine.GameState =
         { Players = players; Table = table; Deck = []
           CurrentPlayerIndex = 0; DealRound = 6; TotalDeals = 6
-          LastCapturer = None; Variant = StandardKasino; SweepsFrozen = false }
+          LastCapturer = None; RecentPlays = []; Variant = StandardKasino; SweepsFrozen = false }
     let final = GameEngine.endRound state
     Assert.Equal(1, final.Table.Length)
 
@@ -174,3 +174,31 @@ let ``computerStyle honours personalities for CPU seats`` () =
     let config = { makeConfig StandardKasino 2 1 with Settings = { Settings.defaultSettings with AiPersonalities = true } }
     Assert.Equal(AI.Balanced, GameEngine.computerStyle config 0)
     Assert.Equal((Personality.forCpu 0).Style, GameEngine.computerStyle config 1)
+
+[<Fact>]
+let ``recent plays keep the other seats' moves since your own`` () =
+    let players =
+        [ { Name = "P1"; Type = Human; Hand = [ { Suit = Hearts; Rank = Nine }; { Suit = Clubs; Rank = Five } ]; CapturedCards = []; Sweeps = 0 }
+          { Name = "CPU 1"; Type = Computer; Hand = [ { Suit = Clubs; Rank = Two } ]; CapturedCards = []; Sweeps = 0 }
+          { Name = "CPU 2"; Type = Computer; Hand = [ { Suit = Diamonds; Rank = King } ]; CapturedCards = []; Sweeps = 0 } ]
+    let state: GameEngine.GameState =
+        { Players = players
+          Table = [ { Suit = Clubs; Rank = Six }; { Suit = Hearts; Rank = Three }; { Suit = Spades; Rank = King } ]
+          Deck = []
+          CurrentPlayerIndex = 0; DealRound = 1; TotalDeals = 6
+          LastCapturer = None; RecentPlays = []; Variant = StandardKasino; SweepsFrozen = false }
+    Assert.Equal<string list>([ "No moves yet this round" ], GameEngine.describeRecentPlays state)
+    // P1: 9♥ takes 6♣ + 3♥ (K♠ stays); CPU 1: 2♣ is placed; CPU 2: K♦ takes K♠
+    let s1 = (GameEngine.playHumanTurn state 0 None).NewState
+    let s2 = (GameEngine.playHumanTurn s1 0 None).NewState
+    let s3 = (GameEngine.playHumanTurn s2 0 None).NewState
+    // back on P1's turn: exactly the two CPU moves, oldest first, P1's own play dropped
+    Assert.Equal(3, s3.RecentPlays.Length + 1)
+    let names = s3.RecentPlays |> List.map (fun p -> p.PlayerName)
+    Assert.Equal<string list>([ "CPU 1"; "CPU 2" ], names)
+    Assert.Empty(s3.RecentPlays[0].Captured)
+    Assert.Equal<Set<Card>>(set [ { Suit = Spades; Rank = King } ], set s3.RecentPlays[1].Captured)
+    let lines = GameEngine.describeRecentPlays s3
+    Assert.StartsWith("CPU 1 placed 2", lines[0])
+    Assert.StartsWith("CPU 2 played K", lines[1])
+    Assert.Contains("taking K", lines[1])

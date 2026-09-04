@@ -182,7 +182,7 @@ let ``a clearing capture scores no sweep once sweeps are frozen`` () =
     let state : GameEngine.GameState =
         { Players = [ human; cpu ]; Table = [ { Suit = Diamonds; Rank = Eight } ]; Deck = []
           CurrentPlayerIndex = 0; DealRound = 6; TotalDeals = 6
-          LastCapturer = None; Variant = StandardKasino; SweepsFrozen = true }
+          LastCapturer = None; RecentPlays = []; Variant = StandardKasino; SweepsFrozen = true }
     let result = GameEngine.playHumanTurn state 0 None
     match result.PlayResult with
     | Capture(_, _, isSweep) -> Assert.False(isSweep, "frozen sweeps must not be flagged")

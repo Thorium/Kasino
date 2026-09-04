@@ -72,6 +72,8 @@ type KasinoGame() as this =
     let mutable font: SpriteFontBase = Unchecked.defaultof<_>
     let mutable fontSmall: SpriteFontBase = Unchecked.defaultof<_>
     let mutable textures: CardRenderer.CardTextures option = None
+    /// Every deck style, loaded once; `textures` is the one the settings select.
+    let mutable decks: Map<Settings.CardStyle, CardRenderer.CardTextures> = Map.empty
     let mutable screen: ActiveScreen = Menu MenuScreen.initial
     let mutable settings = Settings.defaultSettings
     let mutable rng = Random()
@@ -88,7 +90,7 @@ type KasinoGame() as this =
     /// otherwise a single fixed back so it stays constant.
     let applyCardBack (config: GameEngine.GameConfig) (tex: CardRenderer.CardTextures) =
         if config.Settings.RandomCardBacks then CardRenderer.pickRandomBack rng tex
-        elif tex.Backs.Length > 0 then tex.Back <- tex.Backs[0]
+        else CardRenderer.selectBack 0 tex
 
     do
         graphics.PreferredBackBufferWidth <- 1024
@@ -166,10 +168,11 @@ type KasinoGame() as this =
                     if Directory.Exists(srcDir) then srcDir
                     else contentDir  // will fail gracefully in CardRenderer
 
-        textures <- Some (CardRenderer.loadAll this.GraphicsDevice contentDir)
+        decks <- CardRenderer.loadDecks this.GraphicsDevice contentDir
+        textures <- Map.tryFind settings.CardStyle decks
 
         // Set window icon to ace of hearts via SDL2
-        let iconPath = Path.Combine(contentDir, "cards", "he1.png")
+        let iconPath = Path.Combine(contentDir, "cards", "realistic", "he1.png")
         if File.Exists(iconPath) then
             SdlIcon.trySetIcon this.Window.Handle this.GraphicsDevice iconPath
 
@@ -305,6 +308,7 @@ type KasinoGame() as this =
             let newOptions = OptionsScreen.update input (screenW()) (screenH()) optionsState
             if newOptions.BackClicked then
                 settings <- newOptions.Settings
+                textures <- Map.tryFind settings.CardStyle decks
                 screen <- returnTo
             else
                 screen <- Options (newOptions, returnTo)
@@ -332,8 +336,9 @@ type KasinoGame() as this =
         spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp)
 
         match screen, textures with
-        | Menu menuState, texOpt ->
-            MenuScreen.draw spriteBatch font texOpt lastInput menuState (screenW()) (screenH())
+        | Menu menuState, _ ->
+            // The menu's ace fan always shows the original deck, whatever the card style.
+            MenuScreen.draw spriteBatch font (Map.tryFind Settings.Realistic decks) lastInput menuState (screenW()) (screenH())
         | Playing gameState, Some tex ->
             GameScreen.draw spriteBatch font lastInput tex gameState (screenW()) (screenH())
         | Scores scoreState, _ ->
@@ -341,7 +346,7 @@ type KasinoGame() as this =
         | Rules (rulesState, _), texOpt ->
             RulesScreen.draw spriteBatch font texOpt lastInput rulesState (screenW()) (screenH())
         | Options (optionsState, _), _ ->
-            OptionsScreen.draw spriteBatch font lastInput optionsState (screenW()) (screenH())
+            OptionsScreen.draw spriteBatch font (fun style -> Map.tryFind style decks) lastInput optionsState (screenW()) (screenH())
         | _ -> ()
 
         spriteBatch.End()
