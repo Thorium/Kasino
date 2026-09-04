@@ -30,30 +30,33 @@ module MenuScreen =
           HumanCount = 1 }
 
     // ── Button definitions (recomputed each frame) ──────────
+    // Everything scales with CardRenderer.UiScale (about 1.8 on touch devices).
+    let private S (v: int) = int (float v * CardRenderer.UiScale)
+
     let private variantButtons (screenW: int) =
-        [ Button.createCentered "Standard Kasino (maximize)" screenW 200 360 52 (Color.rgb 40 100 40) Color.White
-          Button.createCentered "Laistokasino (minimize)" screenW 264 360 52 (Color.rgb 140 60 40) Color.White ]
+        [ Button.createCentered "Standard Kasino (maximize)" screenW 200 (S 360) (S 52) (Color.rgb 40 100 40) Color.White
+          Button.createCentered "Laistokasino (minimize)" screenW (200 + S 64) (S 360) (S 52) (Color.rgb 140 60 40) Color.White ]
 
     let private playerCountButtons (screenW: int) =
-        let bw = 180
-        let gap = 20
+        let gap = S 20
+        let bw = min (S 180) ((screenW - 2 * gap - 40) / 3)   // three across must fit the width
         let totalW = 3 * bw + 2 * gap
         let baseX = (screenW - totalW) / 2
-        [ Button.create "2 Players" baseX 220 bw 52 (Color.rgb 40 80 120) Color.White
-          Button.create "3 Players" (baseX + bw + gap) 220 bw 52 (Color.rgb 40 80 120) Color.White
-          Button.create "4 Players" (baseX + 2 * (bw + gap)) 220 bw 52 (Color.rgb 40 80 120) Color.White ]
+        [ Button.create "2 Players" baseX 220 bw (S 52) (Color.rgb 40 80 120) Color.White
+          Button.create "3 Players" (baseX + bw + gap) 220 bw (S 52) (Color.rgb 40 80 120) Color.White
+          Button.create "4 Players" (baseX + 2 * (bw + gap)) 220 bw (S 52) (Color.rgb 40 80 120) Color.White ]
 
     let private humanCountButtons (screenW: int) =
-        [ Button.createCentered "Watch AI Only" screenW 220 320 52 (Color.rgb 80 60 120) Color.White
-          Button.createCentered "Play Yourself" screenW 284 320 52 (Color.rgb 40 120 80) Color.White ]
+        [ Button.createCentered "Watch AI Only" screenW 220 (S 320) (S 52) (Color.rgb 80 60 120) Color.White
+          Button.createCentered "Play Yourself" screenW (220 + S 64) (S 320) (S 52) (Color.rgb 40 120 80) Color.White ]
 
     /// "How to Play" button — visible on all menu steps, near the bottom.
     let private howToPlayButton (screenW: int) (screenH: int) =
-        Button.createCentered "How to Play" screenW (screenH - 80) 220 52 (Color.rgb 80 80 40) Color.White
+        Button.createCentered "How to Play" screenW (screenH - S 80) (S 220) (S 52) (Color.rgb 80 80 40) Color.White
 
     /// "Options" button — visible on all menu steps, just above "How to Play".
     let private optionsButton (screenW: int) (screenH: int) =
-        Button.createCentered "Options" screenW (screenH - 142) 220 52 (Color.rgb 60 60 100) Color.White
+        Button.createCentered "Options" screenW (screenH - S 142) (S 220) (S 52) (Color.rgb 60 60 100) Color.White
 
     /// Advance menu based on input (touch buttons + keyboard fallback).
     let update (input: Input.InputState) (screenW: int) (screenH: int) (state: MenuState) =
@@ -111,37 +114,49 @@ module MenuScreen =
 
         // Decorative fan of the four aces — held-in-hand shape — in the empty
         // band between the selection buttons and the bottom Options button.
+        // Scaled with the menu, but never taller than the band it sits in.
         match texOpt with
         | Some tex ->
             // x,y is the card centre (drawImageRotated rotates about it).
             let drawAce (card: Card) (x: float) (y: float) (w: int) (h: int) (rot: float) =
                 Gfx.drawImageRotated g (CardRenderer.getTexture tex card) x y w h rot
-            let fanY = float ((336 + (screenH - 142)) / 2)       // midpoint of the empty band
+            let bandTop = 220 + S 64 + S 52                       // below the tallest button set
+            let bandBottom = screenH - S 142                      // top of the Options button
+            let fanH = min (S 76) (int (float (bandBottom - bandTop) * 0.85))
+            let fanW = fanH * 60 / 76
+            let fanY = float ((bandTop + bandBottom) / 2)         // midpoint of the empty band
             let acesFan = [ Spades, -0.30; Hearts, -0.10; Diamonds, 0.10; Clubs, 0.30 ]
             for i, (suit, rot) in List.indexed acesFan do
                 let off = float i - 1.5                          // -1.5, -0.5, 0.5, 1.5
-                drawAce { Suit = suit; Rank = Ace } (cx + off * 54.0) (fanY + abs off * 9.0) 60 76 rot
+                drawAce { Suit = suit; Rank = Ace } (cx + off * 0.9 * float fanW) (fanY + abs off * 0.15 * float fanW) fanW fanH rot
         | None -> ()
+
+        // Bigger buttons get bigger labels: draw them with the font scaled by
+        // UiScale, keeping the prompt texts at their normal size.
+        let drawButtons (buttons: Button.ButtonDef list) =
+            let baseFont = g.FontSize
+            g.FontSize <- int (float baseFont * CardRenderer.UiScale)
+            Button.drawAll g input buttons
+            g.FontSize <- baseFont
 
         match state.Step with
         | VariantSelect ->
             drawCentered "Choose game variant:" 160 Color.LightGray
-            Button.drawAll g input (variantButtons screenW)
+            drawButtons (variantButtons screenW)
         | PlayerCountSelect ->
             let vName = match state.Variant with StandardKasino -> "Standard" | LaistoKasino -> "Laisto"
             drawCentered ($"Variant: %s{vName}") 140 Color.Gold
             drawCentered "Number of players:" 180 Color.LightGray
-            Button.drawAll g input (playerCountButtons screenW)
+            drawButtons (playerCountButtons screenW)
         | HumanCountSelect ->
             let vName = match state.Variant with StandardKasino -> "Standard" | LaistoKasino -> "Laisto"
             drawCentered ($"Variant: %s{vName}  |  Players: %d{state.PlayerCount}") 140 Color.Gold
             drawCentered "How many human players?" 180 Color.LightGray
-            Button.drawAll g input (humanCountButtons screenW)
+            drawButtons (humanCountButtons screenW)
         | Ready
         | ShowRules | ShowOptions -> ()
 
         match state.Step with
         | Ready | ShowRules | ShowOptions -> ()
         | _ ->
-            Button.draw g input (optionsButton screenW screenH)
-            Button.draw g input (howToPlayButton screenW screenH)
+            drawButtons [ optionsButton screenW screenH; howToPlayButton screenW screenH ]

@@ -116,14 +116,19 @@ module GameScreen =
     let private tableCardGap = 6
 
     // ── Layout helpers ──────────────────────────────────────
-    let private centerCards (screenW: int) (count: int) =
-        let totalW = count * (CardRenderer.scaledWidth () + cardGap) - cardGap
+    let private centerCards (screenW: int) (count: int) (cardW: int) =
+        let totalW = count * (cardW + cardGap) - cardGap
         (screenW - totalW) / 2
 
+    /// Hand card rectangle. The bottom (your) hand uses the interactive card
+    /// size; the top opponent's hand uses the small size.
     let private handCardRect (screenW: int) (screenH: int) (handSize: int) (idx: int) (isBottom: bool) =
-        let x = centerCards screenW handSize + idx * (CardRenderer.scaledWidth () + cardGap)
-        let y = if isBottom then screenH - CardRenderer.scaledHeight () - 20 else 20
-        { X = x; Y = y; Width = CardRenderer.scaledWidth (); Height = CardRenderer.scaledHeight () }
+        let cw, ch =
+            if isBottom then CardRenderer.scaledWidth (), CardRenderer.scaledHeight ()
+            else CardRenderer.smallWidth (), CardRenderer.smallHeight ()
+        let x = centerCards screenW handSize cw + idx * (cw + cardGap)
+        let y = if isBottom then screenH - ch - 20 else 20
+        { X = x; Y = y; Width = cw; Height = ch }
 
     /// Which edge of the table a player occupies, viewed from the bottom seat.
     type private Seat =
@@ -148,16 +153,20 @@ module GameScreen =
 
     /// Top-left position of card i in a side opponent's vertical stack.
     let private sideCardPos (screenW: int) (screenH: int) (seat: Seat) (handSize: int) (i: int) =
-        let cw = CardRenderer.scaledWidth ()
-        let ch = CardRenderer.scaledHeight ()
+        let cw = CardRenderer.smallWidth ()
+        let ch = CardRenderer.smallHeight ()
         let x = match seat with SeatRight -> screenW - cw - 10 | _ -> 10
         let y = screenH / 2 - (handSize * (ch + 4)) / 2 + i * (ch / 3)
         (x, y)
 
     let private tableCardRect (screenW: int) (screenH: int) (count: int) (idx: int) =
-        // Up to 7 cards sit in one row; more split into balanced rows
+        // Up to 7 cards sit in one row (fewer when the cards are large, so a
+        // row never outgrows the screen); more split into balanced rows
         // (9 = 5+4), each row individually centered.
-        let rows = if count <= 7 then 1 else (count + 6) / 7
+        let maxCols =
+            let usable = screenW - 2 * (CardRenderer.smallWidth () + 30)
+            max 1 (min 7 (usable / (CardRenderer.scaledWidth () + tableCardGap)))
+        let rows = if count <= maxCols then 1 else (count + maxCols - 1) / maxCols
         let cols = (count + rows - 1) / rows
         let row = idx / cols
         let col = idx % cols
@@ -177,11 +186,13 @@ module GameScreen =
     let private gridOrder (table: Card list) =
         table |> List.sortBy (fun c -> Cards.tableValue c.Rank, c.Suit)
 
+    /// The felt: below the (small) top hand, between the (small) side hands,
+    /// above the (large) bottom hand and its status lines.
     let private tableArea (screenW: int) (screenH: int) =
         let ch = CardRenderer.scaledHeight ()
-        let cw = CardRenderer.scaledWidth ()
-        let sideMargin = cw + 30
-        { X = sideMargin; Y = ch + 60; Width = screenW - 2 * sideMargin; Height = screenH - 2 * ch - 140 }
+        let sch = CardRenderer.smallHeight ()
+        let sideMargin = CardRenderer.smallWidth () + 30
+        { X = sideMargin; Y = sch + 60; Width = screenW - 2 * sideMargin; Height = screenH - (sch + 60) - (ch + 80) }
 
     /// Compute scattered positions for table cards, placed center-outward.
     /// Card identity seeds the RNG for deterministic but random-looking layout.
@@ -277,11 +288,11 @@ module GameScreen =
                 let handY = float (screenH - CardRenderer.scaledHeight () - 20 + CardRenderer.scaledHeight () / 2)
                 (float (screenW / 2), handY)
             | SeatTop ->
-                let handY = float (20 + CardRenderer.scaledHeight () / 2)
+                let handY = float (20 + CardRenderer.smallHeight () / 2)
                 (float (screenW / 2), handY)
             | seat ->
                 let x, y = sideCardPos screenW screenH seat 4 1
-                (float (x + CardRenderer.scaledWidth () / 2), float (y + CardRenderer.scaledHeight () / 2))
+                (float (x + CardRenderer.smallWidth () / 2), float (y + CardRenderer.smallHeight () / 2))
 
         // Deal like at a real table: two passes of 2 cards to each player —
         // starting with the player next to the dealer (the wave's first to
@@ -907,6 +918,8 @@ module GameScreen =
         let gs = screen.GameState
         let cw = CardRenderer.scaledWidth ()
         let ch = CardRenderer.scaledHeight ()
+        let scw = CardRenderer.smallWidth ()
+        let sch = CardRenderer.smallHeight ()
 
         // ── Progressive deal reveal ─────────────────────
         // The game state is fully dealt before the animation plays, so while
@@ -997,25 +1010,25 @@ module GameScreen =
                 let oppHandSize = dealVisible opp.Name (List.length opp.Hand)
                 for ci in 0 .. oppHandSize - 1 do
                     let r = handCardRect screenW screenH oppHandSize ci false
-                    if opp.Type = Computer && not watchMode then CardRenderer.drawCardBack g textures r.X r.Y
-                    else CardRenderer.drawCard g textures opp.Hand[ci] r.X r.Y
-                drawPlayerLabel g opp 20 (ch + 30) Color.LightSalmon
+                    if opp.Type = Computer && not watchMode then CardRenderer.drawCardBackSized g textures r.X r.Y r.Width r.Height
+                    else CardRenderer.drawCardSized g textures opp.Hand[ci] r.X r.Y r.Width r.Height
+                drawPlayerLabel g opp 20 (sch + 30) Color.LightSalmon
             | SeatLeft ->
                 let n = dealVisible opp.Name (List.length opp.Hand)
                 for ci in 0 .. n - 1 do
                     let x, y = sideCardPos screenW screenH SeatLeft n ci
-                    if watchMode then CardRenderer.drawCard g textures opp.Hand[ci] x y
-                    else CardRenderer.drawCardBack g textures x y
-                let labelY = screenH / 2 - (n * (ch + 4)) / 2 - 20
+                    if watchMode then CardRenderer.drawCardSized g textures opp.Hand[ci] x y scw sch
+                    else CardRenderer.drawCardBackSized g textures x y scw sch
+                let labelY = screenH / 2 - (n * (sch + 4)) / 2 - 20
                 Gfx.fillText g opp.Name 10.0 (float labelY) Color.LightBlue
             | SeatRight ->
                 let n = dealVisible opp.Name (List.length opp.Hand)
-                let sideX = screenW - cw - 10
+                let sideX = screenW - scw - 10
                 for ci in 0 .. n - 1 do
                     let x, y = sideCardPos screenW screenH SeatRight n ci
-                    if watchMode then CardRenderer.drawCard g textures opp.Hand[ci] x y
-                    else CardRenderer.drawCardBack g textures x y
-                let labelY = screenH / 2 - (n * (ch + 4)) / 2 - 20
+                    if watchMode then CardRenderer.drawCardSized g textures opp.Hand[ci] x y scw sch
+                    else CardRenderer.drawCardBackSized g textures x y scw sch
+                let labelY = screenH / 2 - (n * (sch + 4)) / 2 - 20
                 Gfx.fillText g opp.Name (float sideX) (float labelY) Color.Plum
 
         // ── Human hand (bottom, face-up) ───────────
@@ -1072,7 +1085,9 @@ module GameScreen =
         drawPlayerLabel g bottomPlayer 20 (screenH - 18) Color.LightGreen
 
         // ── Status bar ─────────────────────────────
-        let statusY = screenH / 2 + tArea.Height / 2 + 10
+        // just under the felt (the table is not vertically centred in mobile
+        // mode, where the bottom band is taller than the top one)
+        let statusY = tArea.Y + tArea.Height + 10
         Gfx.fillText g screen.LastPlayMessage 20.0 (float statusY) Color.White
 
         let turnText =
@@ -1111,7 +1126,7 @@ module GameScreen =
 
         // ── Scoreboard (top-right) ──
         let scoreX = screenW - 200
-        let scoreStartY = ch + 50
+        let scoreStartY = sch + 50
         Gfx.fillText g "Scores:" (float scoreX) (float scoreStartY) Color.Gold
         gs.Players
         |> List.iteri (fun i p ->

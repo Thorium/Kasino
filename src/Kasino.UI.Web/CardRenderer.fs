@@ -22,11 +22,20 @@ module CardRenderer =
     [<Literal>]
     let CardHeight = 95
 
-    /// Scale factor for rendering cards (canvas is a fixed 768 tall => 1.0).
+    /// Scale of the cards you interact with: your hand, the table and the
+    /// animations. 1.0 on a desktop (the logical space is 768 tall); phones
+    /// and tablets get about double so the cards are readable and tappable.
     let mutable Scale = 1.0
+    /// Scale of the other seats' face-down cards, which only need to show a
+    /// count and stay small even in mobile mode.
+    let mutable SmallScale = 1.0
+    /// Scale of the pre-game menu buttons and the ace fan (bigger on touch).
+    let mutable UiScale = 1.0
 
     let scaledWidth () = int (float CardWidth * Scale)
     let scaledHeight () = int (float CardHeight * Scale)
+    let smallWidth () = int (float CardWidth * SmallScale)
+    let smallHeight () = int (float CardHeight * SmallScale)
 
     let private suitPrefix =
         function
@@ -148,6 +157,13 @@ module CardRenderer =
     /// Draw a face-down card (single card back, not the deck image).
     let drawCardBack (g: Gfx) (textures: CardTextures) (x: int) (y: int) =
         Gfx.drawImage g textures.HandBack x y (scaledWidth ()) (scaledHeight ())
+
+    /// Draw a card / face-down card at an explicit size (opponents' small cards).
+    let drawCardSized (g: Gfx) (textures: CardTextures) (card: Card) (x: int) (y: int) (w: int) (h: int) =
+        Gfx.drawImage g (getTexture textures card) x y w h
+
+    let drawCardBackSized (g: Gfx) (textures: CardTextures) (x: int) (y: int) (w: int) (h: int) =
+        Gfx.drawImage g textures.HandBack x y w h
 
     /// Draw a card with a highlight border (for selection / hover).
     let drawCardHighlighted (g: Gfx) (textures: CardTextures) (card: Card) (x: int) (y: int) (borderColor: Color) =

@@ -61,7 +61,7 @@ The start menu has an **Options** button. All settings are optional and persist 
 | Table layout | Scatter on desktop, Grid on phones/tablets | Start games in Random Scatter or Strict Grid (the web build picks the default from the device, like the card deck) |
 | AI table-talk (chat) | Off | Computer players make short remarks as they play |
 | AI personalities | Off | Named opponents (e.g. *Reno the Risk-taker*, *Cautious Cara*) with distinct play styles |
-| Card deck | Realistic on desktop, Screen-optimized on phones/tablets | **Screen-optimized**: big index and one large centre pip, made for phones (`cards/screen/`); **Realistic**: the original scanned deck (`cards/realistic/`). The web build detects a touch device at startup and picks the default accordingly. The Options screen previews the selected deck with the 10 of diamonds and 2 of spades |
+| Card deck | Realistic on desktop, Screen-optimized on phones/tablets | **Screen-optimized**: big index and one large centre pip, made for phones (`cards/screen/`); **Realistic**: the original scanned deck (`cards/realistic/`). The web build detects a touch device at startup and picks the default accordingly. On phones and tablets the web build also runs in *mobile mode*: your hand and the table cards are drawn about twice as large (the other seats' cards stay small) and the start-menu buttons and ace fan grow to match; append `?mobile=1` to the URL to preview that layout in a desktop browser. The Options screen previews the selected deck with the 10 of diamonds and 2 of spades |
 
 ## Requirements
 

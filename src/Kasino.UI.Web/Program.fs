@@ -31,9 +31,10 @@ let mutable private screen: ActiveScreen = Menu MenuScreen.initial
 /// Phones and tablets — touch as the primary pointer, or a mobile user agent
 /// (iPadOS Safari claims to be a Mac, but its pointer is coarse) — start with
 /// the screen-optimized deck; desktops start with the original one. This only
-/// picks the initial value; Options can change it.
+/// picks the initial value; Options can change it. Append `?mobile=1` to the
+/// URL to force mobile mode in a desktop browser (layout preview / testing).
 let private isTouchDevice: bool =
-    emitJsExpr () "(window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)"
+    emitJsExpr () "(window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || /[?&]mobile=1/.test(location.search)"
 let mutable private settings = Settings.defaultsForDevice isTouchDevice
 let mutable private rng = Random()
 /// Per-game random dealer shift: the first round's starter (the player next
@@ -188,7 +189,10 @@ let private baseLogicalWidth = 1024
 [<Literal>]
 let private maxLogicalWidth = 2048
 [<Literal>]
-let private maxLogicalHeight = 1280
+// Tall phones used to letterbox heavily at 1280; 1600 (a 16:25 board) lets
+// a portrait phone fill much more of its screen while every screen still
+// lays out top- and bottom-anchored.
+let private maxLogicalHeight = 1600
 
 let private resize () =
     let vw = window.innerWidth
@@ -208,6 +212,17 @@ let private resize () =
                 (baseLogicalWidth, h)
         screenW <- w
         screenH <- h
+        // Mobile mode: the cards you play with are about twice as big (a bit
+        // less in landscape, where the 768-tall space must still fit two rows
+        // of table cards), the other seats' cards stay small, and the pre-game
+        // menu grows to match. Desktops keep the 1:1 sizes.
+        if isTouchDevice then
+            CardRenderer.Scale <- (if h >= 1000 then 2.0 else 1.6)
+            CardRenderer.UiScale <- 1.8
+        else
+            CardRenderer.Scale <- 1.0
+            CardRenderer.UiScale <- 1.0
+        CardRenderer.SmallScale <- 1.0
         // CSS box: fill the viewport while preserving the logical aspect
         // ratio. Within the clamps the logical aspect equals the viewport's,
         // so the board runs edge-to-edge.
@@ -231,7 +246,6 @@ resize ()
 window.addEventListener ("resize", fun _ -> resize ())
 
 Input.init canvas
-CardRenderer.Scale <- 1.0
 // Both decks load up front so the Options preview/switch is instant; the
 // active one follows the settings (re-checked when a load finishes, in case
 // the style was switched before its images arrived).
