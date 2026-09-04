@@ -32,31 +32,35 @@ module MenuScreen =
     // ── Button definitions (recomputed each frame) ──────────
     // Everything scales with CardRenderer.UiScale (about 1.8 on touch devices).
     let private S (v: int) = int (float v * CardRenderer.UiScale)
+    /// Button height: a little taller than plain scaling in mobile mode.
+    let private BH () = if CardRenderer.UiScale > 1.0 then S 60 else 52
+    /// Vertical step between two stacked buttons (height + a gap).
+    let private step () = BH () + (if CardRenderer.UiScale > 1.0 then S 20 else 12)
 
     let private variantButtons (screenW: int) =
-        [ Button.createCentered "Standard Kasino (maximize)" screenW 200 (S 360) (S 52) (Color.rgb 40 100 40) Color.White
-          Button.createCentered "Laistokasino (minimize)" screenW (200 + S 64) (S 360) (S 52) (Color.rgb 140 60 40) Color.White ]
+        [ Button.createCentered "Standard Kasino (maximize)" screenW 200 (S 360) (BH ()) (Color.rgb 40 100 40) Color.White
+          Button.createCentered "Laistokasino (minimize)" screenW (200 + step ()) (S 360) (BH ()) (Color.rgb 140 60 40) Color.White ]
 
     let private playerCountButtons (screenW: int) =
         let gap = S 20
         let bw = min (S 180) ((screenW - 2 * gap - 40) / 3)   // three across must fit the width
         let totalW = 3 * bw + 2 * gap
         let baseX = (screenW - totalW) / 2
-        [ Button.create "2 Players" baseX 220 bw (S 52) (Color.rgb 40 80 120) Color.White
-          Button.create "3 Players" (baseX + bw + gap) 220 bw (S 52) (Color.rgb 40 80 120) Color.White
-          Button.create "4 Players" (baseX + 2 * (bw + gap)) 220 bw (S 52) (Color.rgb 40 80 120) Color.White ]
+        [ Button.create "2 Players" baseX 220 bw (BH ()) (Color.rgb 40 80 120) Color.White
+          Button.create "3 Players" (baseX + bw + gap) 220 bw (BH ()) (Color.rgb 40 80 120) Color.White
+          Button.create "4 Players" (baseX + 2 * (bw + gap)) 220 bw (BH ()) (Color.rgb 40 80 120) Color.White ]
 
     let private humanCountButtons (screenW: int) =
-        [ Button.createCentered "Watch AI Only" screenW 220 (S 320) (S 52) (Color.rgb 80 60 120) Color.White
-          Button.createCentered "Play Yourself" screenW (220 + S 64) (S 320) (S 52) (Color.rgb 40 120 80) Color.White ]
+        [ Button.createCentered "Watch AI Only" screenW 220 (S 320) (BH ()) (Color.rgb 80 60 120) Color.White
+          Button.createCentered "Play Yourself" screenW (220 + step ()) (S 320) (BH ()) (Color.rgb 40 120 80) Color.White ]
 
     /// "How to Play" button — visible on all menu steps, near the bottom.
     let private howToPlayButton (screenW: int) (screenH: int) =
-        Button.createCentered "How to Play" screenW (screenH - S 80) (S 220) (S 52) (Color.rgb 80 80 40) Color.White
+        Button.createCentered "How to Play" screenW (screenH - S 80) (S 220) (BH ()) (Color.rgb 80 80 40) Color.White
 
     /// "Options" button — visible on all menu steps, just above "How to Play".
     let private optionsButton (screenW: int) (screenH: int) =
-        Button.createCentered "Options" screenW (screenH - S 142) (S 220) (S 52) (Color.rgb 60 60 100) Color.White
+        Button.createCentered "Options" screenW (screenH - S 80 - step ()) (S 220) (BH ()) (Color.rgb 60 60 100) Color.White
 
     /// Advance menu based on input (touch buttons + keyboard fallback).
     let update (input: Input.InputState) (screenW: int) (screenH: int) (state: MenuState) =
@@ -120,8 +124,8 @@ module MenuScreen =
             // x,y is the card centre (drawImageRotated rotates about it).
             let drawAce (card: Card) (x: float) (y: float) (w: int) (h: int) (rot: float) =
                 Gfx.drawImageRotated g (CardRenderer.getTexture tex card) x y w h rot
-            let bandTop = 220 + S 64 + S 52                       // below the tallest button set
-            let bandBottom = screenH - S 142                      // top of the Options button
+            let bandTop = 220 + step () + BH ()                   // below the tallest button set
+            let bandBottom = screenH - S 80 - step ()             // top of the Options button
             let fanH = min (S 76) (int (float (bandBottom - bandTop) * 0.85))
             let fanW = fanH * 60 / 76
             let fanY = float ((bandTop + bandBottom) / 2)         // midpoint of the empty band

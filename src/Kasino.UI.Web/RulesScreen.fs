@@ -275,7 +275,7 @@ module RulesScreen =
 
         match pages.[state.CurrentPage] with
         | TextPage(_, lines) ->
-            let lineH = 22
+            let lineH = g.FontSize - 2
             let startY = 115
             for i in 0 .. lines.Length - 1 do
                 let line = lines[i]

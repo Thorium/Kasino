@@ -1087,7 +1087,7 @@ module GameScreen =
         // ── Status bar ─────────────────────────────
         // just under the felt (the table is not vertically centred in mobile
         // mode, where the bottom band is taller than the top one)
-        let statusY = tArea.Y + tArea.Height + 10
+        let statusY = tArea.Y + tArea.Height + 4
         Gfx.fillText g screen.LastPlayMessage 20.0 (float statusY) Color.White
 
         let turnText =
@@ -1109,7 +1109,7 @@ module GameScreen =
             | Dealing _ -> "Dealing..."
             | RoundOver -> "Round over! [Enter] continue"
             | GameOver -> "Game over!"
-        Gfx.fillText g turnText 20.0 (float (statusY + 20)) Color.Gold
+        Gfx.fillText g turnText 20.0 (float (statusY + g.FontSize - 2)) Color.Gold
 
         // ── Table-talk bubble (optional AI chat) ────────
         match screen.Chat with
@@ -1131,7 +1131,7 @@ module GameScreen =
         gs.Players
         |> List.iteri (fun i p ->
             let cumScore = screen.CumulativeScores |> Map.tryFind p.Name |> Option.defaultValue 0
-            Gfx.fillText g ($"%s{p.Name}: %d{cumScore}") (float scoreX) (float (scoreStartY + 24 + i * 22)) Color.White)
+            Gfx.fillText g ($"%s{p.Name}: %d{cumScore}") (float scoreX) (float (scoreStartY + g.FontSize + i * (g.FontSize - 2))) Color.White)
 
         let infoY = scoreStartY + 24 + gs.Players.Length * 22 + 8
         let deckCount = List.length gs.Deck
@@ -1155,7 +1155,7 @@ module GameScreen =
             // one line per recent play (captures and placements)
             if screen.ShowRecentPlays then
                 let lines = GameEngine.describeRecentPlays gs
-                let lineH = 26
+                let lineH = g.FontSize + 2
                 Gfx.fillRect g { X = 20; Y = 76; Width = 640; Height = lineH * lines.Length + 12 } (Color.rgba 0 0 0 230)
                 lines |> List.iteri (fun i line ->
                     Gfx.fillText g line 30.0 (float (82 + i * lineH)) Color.Gold)

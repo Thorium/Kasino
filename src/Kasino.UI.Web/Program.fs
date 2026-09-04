@@ -219,9 +219,11 @@ let private resize () =
         if isTouchDevice then
             CardRenderer.Scale <- (if h >= 1000 then 2.0 else 1.6)
             CardRenderer.UiScale <- 1.8
+            g.FontSize <- 28   // all UI text a notch larger on touch screens
         else
             CardRenderer.Scale <- 1.0
             CardRenderer.UiScale <- 1.0
+            g.FontSize <- 24
         CardRenderer.SmallScale <- 1.0
         // CSS box: fill the viewport while preserving the logical aspect
         // ratio. Within the clamps the logical aspect equals the viewport's,
