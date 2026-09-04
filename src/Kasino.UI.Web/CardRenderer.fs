@@ -9,9 +9,10 @@ open Kasino.Domain
 
 // ─────────────────────────────────────────────────────────────
 // Card image loading and rendering for the web front-end.
-// Card images: 75x95 px PNGs served from <base>/cards/, named by
-// suit prefix + rank (sp/he/di/cl, 1..10/j/q/k), plus back.png and
-// table_bg.png. Mirrors the desktop CardRenderer drawing helpers.
+// Card images: PNGs served from <base>/cards/<style>/ (one folder per
+// deck style, see Settings.CardStyle), named by suit prefix + rank
+// (sp/he/di/cl, 1..10/j/q/k) plus back.png; table_bg.png is shared and
+// sits in <base>/cards/. Mirrors the desktop CardRenderer drawing helpers.
 // ─────────────────────────────────────────────────────────────
 
 module CardRenderer =
@@ -48,32 +49,38 @@ module CardRenderer =
 
     type CardTextures =
         { Cards: Dictionary<string, HTMLImageElement>
-          mutable Back: HTMLImageElement  // currently active deck image (one of Backs)
-          HandBack: HTMLImageElement      // single card back for face-down hand cards
-          Backs: HTMLImageElement[]       // available deck designs (scenic, stacked edges)
+          mutable Back: HTMLImageElement      // currently active deck image (one of Backs)
+          mutable HandBack: HTMLImageElement  // single card back for face-down hand cards (matches Back)
+          Backs: HTMLImageElement[]           // available deck designs (scenic, stacked edges)
+          HandBacks: HTMLImageElement[]       // the single-card back of each design (parallel to Backs)
           TableBg: HTMLImageElement }
 
     /// Vite's configured base URL (always ends in "/").
     let private baseUrl: string = emitJsExpr () "import.meta.env.BASE_URL"
 
-    let private newImage (file: string) : HTMLImageElement =
+    let private newImage (path: string) : HTMLImageElement =
         let img = document.createElement "img" :?> HTMLImageElement
-        img.src <- $"{baseUrl}cards/{file}"
+        img.src <- $"{baseUrl}{path}"
         img
 
-    /// Load every card image and invoke `onReady` once all have settled
-    /// (each image resolves via either onload or onerror so we never hang).
-    let loadAll (onReady: CardTextures -> unit) =
-        // Scenic card backs carried over from the original 2002 deck; one is
-        // chosen at random per game (see pickRandomBack). back.png is the
-        // procedural fallback used only if none of these load.
+    /// Load every card image of one deck style and invoke `onReady` once all
+    /// have settled (each image resolves via either onload or onerror so we
+    /// never hang).
+    let loadAll (style: Settings.CardStyle) (onReady: CardTextures -> unit) =
+        let dir = Settings.CardStyle.folder style
+        let pathOf file = if file = "table_bg.png" then $"cards/{file}" else $"cards/{dir}/{file}"
+        // Scenic deck designs carried over from the original 2002 deck, each
+        // with its single-card hand back; one design is chosen per game (see
+        // pickRandomBack). back.png is the fallback if none of these load.
         let backFiles = [ "back1.png"; "back2.png"; "back3.png" ]
+        let handBackFiles = [ "handback1.png"; "handback2.png"; "handback3.png" ]
         let files =
             [ for suit in Cards.allSuits do
                 for rank in Cards.allRanks do
                     yield cardFilename { Suit = suit; Rank = rank } ]
             @ [ "back.png"; "table_bg.png" ]
             @ backFiles
+            @ handBackFiles
 
         let mutable remaining = files.Length
         let images = Dictionary<string, HTMLImageElement>()
@@ -88,35 +95,45 @@ module CardRenderer =
                         match images.TryGetValue f with
                         | true, img -> cards[f] <- img
                         | _ -> ()
+                let loaded f =
+                    match images.TryGetValue f with
+                    | true, img when img.naturalWidth > 0 -> Some img
+                    | _ -> None
                 let loadedBacks =
-                    backFiles
-                    |> List.choose (fun f ->
-                        match images.TryGetValue f with
-                        | true, img when img.naturalWidth > 0 -> Some img
-                        | _ -> None)
-                let backs =
+                    List.zip backFiles handBackFiles
+                    |> List.choose (fun (pile, single) ->
+                        loaded pile |> Option.map (fun p -> p, defaultArg (loaded single) images["back.png"]))
+                let backs, handBacks =
                     match loadedBacks with
-                    | [] -> [| images["back.png"] |]
-                    | xs -> List.toArray xs
+                    | [] -> [| images["back.png"] |], [| images["back.png"] |]
+                    | xs -> List.map fst xs |> List.toArray, List.map snd xs |> List.toArray
                 // The scenic backN images are deck-pile art (stacked edges
-                // baked in); face-down hand cards always use the plain back.
+                // baked in); face-down hand cards use the matching plain back.
                 onReady
                     { Cards = cards
                       Back = backs[0]
-                      HandBack = images["back.png"]
+                      HandBack = handBacks[0]
                       Backs = backs
+                      HandBacks = handBacks
                       TableBg = images["table_bg.png"] }
 
         for file in files do
-            let img = newImage file
+            let img = newImage (pathOf file)
             images[file] <- img
             img.onload <- fun _ -> settle ()
             img.onerror <- fun _ -> settle ()
 
-    /// Pick a random card back for the next game/round (mutates the active Back).
+    /// Select deck design i for the game: deck pile and hand back together.
+    let selectBack (i: int) (textures: CardTextures) =
+        if textures.Backs.Length > 0 then
+            let i = ((i % textures.Backs.Length) + textures.Backs.Length) % textures.Backs.Length
+            textures.Back <- textures.Backs[i]
+            textures.HandBack <- textures.HandBacks[i]
+
+    /// Pick a random deck design for the next game (mutates Back and HandBack).
     let pickRandomBack (rng: System.Random) (textures: CardTextures) =
         if textures.Backs.Length > 0 then
-            textures.Back <- textures.Backs[rng.Next textures.Backs.Length]
+            selectBack (rng.Next textures.Backs.Length) textures
 
     /// Image for a specific card (falls back to the card back if missing).
     let getTexture (textures: CardTextures) (card: Card) =

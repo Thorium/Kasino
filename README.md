@@ -49,6 +49,8 @@ The table layout can be toggled between **Strict Grid** and **Random Scatter** v
 
 Full rules are available in-game via the **How to Play** button.
 
+Missed what the computer players just did? The in-game **?** button opens a small panel listing every other seat's play since your own (who played which card, and what it took or that it was placed). Any click closes it again; the **i** button opens the rules.
+
 ## Options
 
 The start menu has an **Options** button. All settings are optional and persist for the session:
@@ -56,9 +58,10 @@ The start menu has an **Options** button. All settings are optional and persist 
 | Setting | Default | Effect |
 |---|---|---|
 | Random card backs | On | Pick a random scenic card back per game (vs. a fixed back) |
-| Table layout | Scatter | Start games in Random Scatter or Strict Grid |
+| Table layout | Scatter on desktop, Grid on phones/tablets | Start games in Random Scatter or Strict Grid (the web build picks the default from the device, like the card deck) |
 | AI table-talk (chat) | Off | Computer players make short remarks as they play |
 | AI personalities | Off | Named opponents (e.g. *Reno the Risk-taker*, *Cautious Cara*) with distinct play styles |
+| Card deck | Realistic on desktop, Screen-optimized on phones/tablets | **Screen-optimized**: big index and one large centre pip, made for phones (`cards/screen/`); **Realistic**: the original scanned deck (`cards/realistic/`). The web build detects a touch device at startup and picks the default accordingly. The Options screen previews the selected deck with the 10 of diamonds and 2 of spades |
 
 ## Requirements
 

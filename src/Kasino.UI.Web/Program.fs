@@ -28,19 +28,27 @@ let mutable screenW = 1024
 let mutable screenH = 768
 
 let mutable private screen: ActiveScreen = Menu MenuScreen.initial
-let mutable private settings = Settings.defaultSettings
+/// Phones and tablets — touch as the primary pointer, or a mobile user agent
+/// (iPadOS Safari claims to be a Mac, but its pointer is coarse) — start with
+/// the screen-optimized deck; desktops start with the original one. This only
+/// picks the initial value; Options can change it.
+let private isTouchDevice: bool =
+    emitJsExpr () "(window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)"
+let mutable private settings = Settings.defaultsForDevice isTouchDevice
 let mutable private rng = Random()
 /// Per-game random dealer shift: the first round's starter (the player next
 /// to the dealer) is drawn at game start instead of always seat 0.
 let mutable private dealerOffset = 0
 let mutable private textures: CardRenderer.CardTextures option = None
+/// Every deck style, loaded once; `textures` is the one the settings select.
+let mutable private decks: Map<Settings.CardStyle, CardRenderer.CardTextures> = Map.empty
 let mutable private lastTime = 0.0
 
 /// Choose the card back for a new game: random scenic back if enabled,
 /// otherwise a single fixed back so it stays constant.
 let private applyCardBack (config: GameEngine.GameConfig) (tex: CardRenderer.CardTextures) =
     if config.Settings.RandomCardBacks then CardRenderer.pickRandomBack rng tex
-    elif tex.Backs.Length > 0 then tex.Back <- tex.Backs[0]
+    else CardRenderer.selectBack 0 tex
 
 let private updateScreen (input: Input.InputState) (dt: float) =
     match screen with
@@ -141,6 +149,7 @@ let private updateScreen (input: Input.InputState) (dt: float) =
         let newOptions = OptionsScreen.update input screenW screenH optionsState
         if newOptions.BackClicked then
             settings <- newOptions.Settings
+            textures <- Map.tryFind settings.CardStyle decks
             screen <- returnTo
         else
             screen <- Options(newOptions, returnTo)
@@ -148,11 +157,12 @@ let private updateScreen (input: Input.InputState) (dt: float) =
 let private drawAll (g: Gfx) (input: Input.InputState) =
     Gfx.clear g screenW screenH (Color.rgb 25 50 35)
     match screen, textures with
-    | Menu m, tex -> MenuScreen.draw g tex input m screenW screenH
+    // The menu's ace fan always shows the original deck, whatever the card style.
+    | Menu m, _ -> MenuScreen.draw g (Map.tryFind Settings.Realistic decks) input m screenW screenH
     | Playing p, Some tex -> GameScreen.draw g input tex p screenW screenH
     | Scores s, _ -> ScoreScreen.draw g input s screenW screenH
     | Rules(r, _), tex -> RulesScreen.draw g tex input r screenW screenH
-    | Options(o, _), _ -> OptionsScreen.draw g input o screenW screenH
+    | Options(o, _), _ -> OptionsScreen.draw g (fun style -> Map.tryFind style decks) input o screenW screenH
     | Playing _, None -> Gfx.fillText g "Loading..." 40.0 40.0 Color.White
 
 // ── Bootstrap ───────────────────────────────────────────────
@@ -222,7 +232,13 @@ window.addEventListener ("resize", fun _ -> resize ())
 
 Input.init canvas
 CardRenderer.Scale <- 1.0
-CardRenderer.loadAll (fun tex -> textures <- Some tex)
+// Both decks load up front so the Options preview/switch is instant; the
+// active one follows the settings (re-checked when a load finishes, in case
+// the style was switched before its images arrived).
+for style in Settings.CardStyle.all do
+    CardRenderer.loadAll style (fun tex ->
+        decks <- Map.add style tex decks
+        if style = settings.CardStyle then textures <- Some tex)
 
 let rec private loop (timestamp: float) =
     let dt = if lastTime <= 0.0 then 0.0 else min 0.1 ((timestamp - lastTime) / 1000.0)

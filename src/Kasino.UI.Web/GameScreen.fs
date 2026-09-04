@@ -74,6 +74,8 @@ module GameScreen =
           CapturePreview: CapturePreview
           ContinueClicked: bool
           ShowRulesClicked: bool
+          /// "Last moves" toggle: panel listing the other seats' recent plays
+          ShowRecentPlays: bool
           MenuClicked: bool
           DragState: DragState
           TableLayout: TableLayout
@@ -347,15 +349,20 @@ module GameScreen =
             | MultipleCaptures _ -> "Play (Choose Capture)", Color.rgb 160 160 40
         Button.createCentered label screenW (screenH - CardRenderer.scaledHeight () - 80) 240 52 color Color.White
 
-    let private helpButton (_screenW: int) =
-        Button.create "?" 20 20 120 48 (Color.rgb 80 80 40) Color.White
+    /// Rules ("i") and Menu sit top-right so the top opponent's hand (centred) stays clear
+    let private helpButton (screenW: int) =
+        Button.create "i" (screenW - 280) 20 120 48 (Color.rgb 80 80 40) Color.White
 
     let private layoutToggleButton (_screenW: int) (layout: TableLayout) =
         let label = match layout with StrictGrid -> "Scatter" | RandomScatter -> "Grid"
         Button.create label 160 20 120 48 (Color.rgb 60 80 60) Color.White
 
-    let private menuButton (_screenW: int) =
-        Button.create "Menu" 300 20 120 48 (Color.rgb 120 40 40) Color.White
+    let private menuButton (screenW: int) =
+        Button.create "Menu" (screenW - 140) 20 120 48 (Color.rgb 120 40 40) Color.White
+
+    /// "Last moves" toggle — panel listing what the other seats did since your play
+    let private recentPlaysButton (_screenW: int) =
+        Button.create "?" 20 20 120 48 (Color.rgb 60 70 110) Color.White
 
     let private continueButton (screenW: int) (screenH: int) =
         Button.createCentered "Continue" screenW (screenH / 2 + 60) 200 52 (Color.rgb 40 80 140) Color.White
@@ -453,6 +460,7 @@ module GameScreen =
           CapturePreview = NoCapture
           ContinueClicked = false
           ShowRulesClicked = false
+          ShowRecentPlays = false
           MenuClicked = false
           DragState = NotDragging
           TableLayout = (if config.Settings.DefaultScatter then RandomScatter else StrictGrid)
@@ -587,6 +595,12 @@ module GameScreen =
             | StrictGrid -> screen
 
         // ── Global controls ─────────────────────────────────
+        // Any click outside the "?" button closes the recent-moves panel
+        // (the button itself toggles it below).
+        let screen =
+            if screen.ShowRecentPlays && input.Mouse.LeftJustClicked && not (Button.isClicked input (recentPlaysButton screenW)) then
+                { screen with ShowRecentPlays = false }
+            else screen
         // The "?", Menu, and layout buttons are drawn in every phase except
         // the capture modal, so they must also react in every such phase —
         // notably watch-AI-only games, which never reach WaitingForHuman.
@@ -603,6 +617,8 @@ module GameScreen =
             { screen with ShowRulesClicked = true }
         elif not inCaptureModal && Button.isClicked input (menuButton screenW) then
             { screen with MenuClicked = true }
+        elif not inCaptureModal && Button.isClicked input (recentPlaysButton screenW) then
+            { screen with ShowRecentPlays = not screen.ShowRecentPlays }
         elif not inCaptureModal && Button.isClicked input (layoutToggleButton screenW screen.TableLayout) then
             let newLayout = match screen.TableLayout with StrictGrid -> RandomScatter | RandomScatter -> StrictGrid
             let newScatter =
@@ -1119,6 +1135,15 @@ module GameScreen =
             Button.draw g input (helpButton screenW)
             Button.draw g input (layoutToggleButton screenW screen.TableLayout)
             Button.draw g input (menuButton screenW)
+            Button.draw g input (recentPlaysButton screenW)
+            // "What did the others just do?" — popup panel under the buttons,
+            // one line per recent play (captures and placements)
+            if screen.ShowRecentPlays then
+                let lines = GameEngine.describeRecentPlays gs
+                let lineH = 26
+                Gfx.fillRect g { X = 20; Y = 76; Width = 640; Height = lineH * lines.Length + 12 } (Color.rgba 0 0 0 230)
+                lines |> List.iteri (fun i line ->
+                    Gfx.fillText g line 30.0 (float (82 + i * lineH)) Color.Gold)
 
         // ── Shuffle animation (riffle) ──
         match screen.Phase with
