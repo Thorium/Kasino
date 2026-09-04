@@ -48,6 +48,8 @@ module Game =
           /// Per-game random dealer shift: the first round's starter (the
           /// player next to the dealer) is drawn at game start, not seat 0.
           DealerOffset: int
+          /// Every deck style, loaded once; Textures is the one the settings select.
+          Decks: Map<Settings.CardStyle, CardRenderer.CardTextures>
           Textures: CardRenderer.CardTextures option
           Font: SpriteFont option
           Input: Input.RawInput }
@@ -61,7 +63,7 @@ module Game =
     /// otherwise a fixed back so it stays constant.
     let private applyCardBack (rng: Random) (config: GameEngine.GameConfig) (tex: CardRenderer.CardTextures) =
         if config.Settings.RandomCardBacks then CardRenderer.pickRandomBack rng tex
-        elif tex.Backs.Length > 0 then tex.Back <- tex.Backs[0]
+        else CardRenderer.selectBack 0 tex
 
     let private findContentDir () =
         let d = Path.Combine(AppContext.BaseDirectory, "Content")
@@ -83,17 +85,19 @@ module Game =
           Settings = Settings.defaultSettings
           Rng = Random()
           DealerOffset = 0
+          Decks = Map.empty
           Textures = None
           Font = None
           Input = Input.emptyRaw }
 
     let init (ctx: GameContext) : struct (Model * Cmd<Msg>) =
         let device = MonoGameGameContext.getGraphicsDevice ctx
-        let textures = CardRenderer.loadAll device (findContentDir ())
+        let decks = CardRenderer.loadDecks device (findContentDir ())
         CardRenderer.Scale <- float32 WindowH / 768.0f
         let assets = GameContext.getService<IAssets> ctx
         let font = assets.Font "fonts/UI"
-        struct ({ freshModel () with Textures = Some textures; Font = Some font }, Cmd.none)
+        let fresh = freshModel ()
+        struct ({ fresh with Decks = decks; Textures = Map.tryFind fresh.Settings.CardStyle decks; Font = Some font }, Cmd.none)
 
     /// Init for the headless runtime: no window, no graphics services.
     let initHeadless (_ctx: GameContext) : struct (Model * Cmd<Msg>) =
@@ -198,7 +202,12 @@ module Game =
         | Options (optionsState, returnTo) ->
             let newOptions = OptionsScreen.update input w h optionsState
             if newOptions.BackClicked then
-                { model with Settings = newOptions.Settings; Screen = returnTo }
+                // switch the active deck with the setting (headless runs have no decks)
+                let textures =
+                    match Map.tryFind newOptions.Settings.CardStyle model.Decks with
+                    | Some tex -> Some tex
+                    | None -> model.Textures
+                { model with Settings = newOptions.Settings; Textures = textures; Screen = returnTo }
             else
                 { model with Screen = Options (newOptions, returnTo) }
 
@@ -240,14 +249,15 @@ module Game =
         | Some font ->
             let input = Input.project model.Input
             match model.Screen with
-            | Menu m -> MenuScreen.draw buffer font model.Textures input m w h
+            // The menu's ace fan always shows the original deck, whatever the card style.
+            | Menu m -> MenuScreen.draw buffer font (Map.tryFind Settings.Realistic model.Decks) input m w h
             | Playing g ->
                 match model.Textures with
                 | Some tex -> GameScreen.draw buffer font input tex g w h
                 | None -> ()
             | Scores s -> ScoreScreen.draw buffer font input s w h
             | Rules (r, _) -> RulesScreen.draw buffer font model.Textures input r w h
-            | Options (o, _) -> OptionsScreen.draw buffer font input o w h
+            | Options (o, _) -> OptionsScreen.draw buffer font (fun style -> Map.tryFind style model.Decks) input o w h
         | None -> ()
 
     // ── Subscriptions ──

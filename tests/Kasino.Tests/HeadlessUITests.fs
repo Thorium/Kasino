@@ -254,8 +254,8 @@ let ``human card selection works by clicking its hit-rect`` () =
 let ``menu button in game returns to the main menu`` () =
     use runner = newRunner ()
     startAiGame runner
-    // "Menu" is the in-game top bar button at (300, 20) 120x48.
-    click runner 360.0f 44.0f
+    // "Menu" is the in-game top-right button at (WindowW - 140, 20) 120x48.
+    click runner 944.0f 44.0f
     match runner.Model.Screen with
     | Game.Menu _ -> ()
     | other -> failwith $"expected Menu, got %A{other}"
@@ -383,3 +383,17 @@ let ``strict rules keep the capture modal open on escape`` () =
     (match s3.Phase with
      | GameScreen.AnimatingPlay _ -> ()
      | other -> failwith $"expected AnimatingPlay, got %A{other}")
+
+[<Fact>]
+let ``recent-moves panel opens from the ? button and closes on any other click`` () =
+    use runner = newRunner ()
+    startAiGame runner
+    // "?" is the in-game top-left button at (20, 20) 120x48
+    click runner 80.0f 44.0f
+    match runner.Model.Screen with
+    | Game.Playing g -> Assert.True(g.ShowRecentPlays)
+    | other -> failwith $"expected Playing, got %A{other}"
+    click runner 512.0f 400.0f    // anywhere else (the table)
+    match runner.Model.Screen with
+    | Game.Playing g -> Assert.False(g.ShowRecentPlays)
+    | other -> failwith $"expected Playing, got %A{other}"
