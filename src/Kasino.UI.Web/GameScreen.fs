@@ -358,7 +358,9 @@ module GameScreen =
             | SingleCapture cards ->
                 (if strict then "Capture Cards" else $"Capture %d{cards.Length} Cards"), Color.rgb 40 140 40
             | MultipleCaptures _ -> "Play (Choose Capture)", Color.rgb 160 160 40
-        Button.createCentered label screenW (screenH - CardRenderer.scaledHeight () - 80) 240 52 color Color.White
+        // a bit larger in mobile mode (secondary buttons, so less than the menu's 1.8x)
+        let s = if CardRenderer.UiScale > 1.0 then 1.3 else 1.0
+        Button.createCentered label screenW (screenH - CardRenderer.scaledHeight () - int (80.0 * s)) (int (240.0 * s)) (int (52.0 * s)) color Color.White
 
     /// Rules ("i") and Menu sit top-right so the top opponent's hand (centred) stays clear
     let private helpButton (screenW: int) =
@@ -383,7 +385,8 @@ module GameScreen =
     /// Small "Place Instead" button — offered beside the Play button in
     /// Standard Kasino, where capturing is optional.
     let private placeInsteadButton (screenW: int) (screenH: int) =
-        Button.create "Place Instead" (screenW / 2 + 130) (screenH - CardRenderer.scaledHeight () - 80) 170 52 (Color.rgb 100 100 100) Color.White
+        let s = if CardRenderer.UiScale > 1.0 then 1.3 else 1.0
+        Button.create "Place Instead" (screenW / 2 + int (130.0 * s)) (screenH - CardRenderer.scaledHeight () - int (80.0 * s)) (int (170.0 * s)) (int (52.0 * s)) (Color.rgb 100 100 100) Color.White
 
     /// Suit tint for card names rendered as text: red suits reddish, black
     /// suits gray, so the card lists read at a glance against white text.
@@ -395,8 +398,10 @@ module GameScreen =
     /// Label segments for a capture-option button: white prefix/suffix with
     /// each card name tinted by its suit.
     let private captureOptionSegments (num: int) (captured: Card list) =
+        // wider gaps between the card names in mobile mode, so they read apart
+        let sep = if CardRenderer.UiScale > 1.0 then "   " else " "
         [ yield ($"%d{num}: ", Color.White)
-          for c in captured do yield (Cards.display c + " ", cardTextColor c)
+          for c in captured do yield (Cards.display c + sep, cardTextColor c)
           yield ($"(%d{captured.Length} cards)", Color.White) ]
 
     /// The capture-choice modal, paginated so it always fits on screen
@@ -410,8 +415,18 @@ module GameScreen =
           VisibleCount: int
           NextPage: int }
 
+    /// Modal scale: larger rows, text and gaps in mobile mode (1.6x; the option
+    /// labels are long, so less than the menu's 1.8x).
+    let private modalScale () = if CardRenderer.UiScale > 1.0 then 1.6 else 1.0
+
     let private captureModal (variant: GameVariant) (strict: bool) (options: Rules.CaptureOption list) (page: int) (screenW: int) (screenH: int) : CaptureModal =
-        let perPage = max 3 ((screenH - 240) / 56)
+        let ms = modalScale ()
+        let S (v: int) = int (float v * ms)
+        let rowH = S 48
+        // finger-sized gap between rows in mobile mode
+        let pitch = if ms > 1.0 then rowH + S 16 else 56
+        let rowW = min (S 450) (screenW - 40)
+        let perPage = max 3 ((screenH - S 240) / pitch)
         let pageCount = (options.Length + perPage - 1) / perPage
         let page = ((page % pageCount) + pageCount) % pageCount
         let startIdx = page * perPage
@@ -419,28 +434,28 @@ module GameScreen =
         let allowPlace = (variant = StandardKasino)
         let navRows = if pageCount > 1 then 1 else 0
         let placeRows = if allowPlace then 1 else 0
-        let totalH = (visible.Length + navRows + placeRows) * 56 + 64
+        let totalH = (visible.Length + navRows + placeRows) * pitch + S 64
         let baseY = max 20 ((screenH - totalH) / 2)
         let optButtons =
             visible
             |> List.mapi (fun i opt ->
                 let cards = opt.Captured |> List.map Cards.display |> String.concat " "
                 let label = sprintf "%d: %s (%d cards)" (i + 1) cards opt.Captured.Length
-                (startIdx + i, Button.createCentered label screenW (baseY + i * 56) 450 48 (Color.rgb 60 80 60) Color.White))
-        let navY = baseY + visible.Length * 56
+                (startIdx + i, Button.createCentered label screenW (baseY + i * pitch) rowW rowH (Color.rgb 60 80 60) Color.White))
+        let navY = baseY + visible.Length * pitch
         let moreButton =
             if pageCount > 1 then
-                Some (Button.createCentered (sprintf "More options (%d/%d)" (page + 1) pageCount) screenW navY 450 48 (Color.rgb 60 60 100) Color.White)
+                Some (Button.createCentered (sprintf "More options (%d/%d)" (page + 1) pageCount) screenW navY rowW rowH (Color.rgb 60 60 100) Color.White)
             else None
-        let placeY = navY + navRows * 56
+        let placeY = navY + navRows * pitch
         let placeButton =
             if allowPlace then
-                Some (Button.createCentered "Place on table instead" screenW placeY 450 48 (Color.rgb 100 100 100) Color.White)
+                Some (Button.createCentered "Place on table instead" screenW placeY rowW rowH (Color.rgb 100 100 100) Color.White)
             else None
         // Strict rules: the touched card must be played — no cancelling out.
         let cancelBtn =
             if strict then None
-            else Some (Button.createCentered "Cancel" screenW (placeY + placeRows * 56 + 8) 180 48 (Color.rgb 120 40 40) Color.White)
+            else Some (Button.createCentered "Cancel" screenW (placeY + placeRows * pitch + S 8) (S 180) rowH (Color.rgb 120 40 40) Color.White)
         { OptionButtons = optButtons
           MoreButton = moreButton
           PlaceButton = placeButton
@@ -1067,12 +1082,16 @@ module GameScreen =
             // Kasino, card can capture).
             match screen.Phase, screen.SelectedCardIndex, screen.DragState with
             | WaitingForHuman, Some _, NotDragging ->
+                // labels follow the buttons' mobile-mode size
+                let baseFont = g.FontSize
+                if CardRenderer.UiScale > 1.0 then g.FontSize <- int (float baseFont * 1.3)
                 Button.draw g input (playButton screenW screenH screen.Config.Settings.StrictRules screen.CapturePreview)
                 let canPlaceInstead =
                     gs.Variant = StandardKasino
                     && (match screen.CapturePreview with NoCapture -> false | SingleCapture _ | MultipleCaptures _ -> true)
                 if canPlaceInstead then
                     Button.draw g input (placeInsteadButton screenW screenH)
+                g.FontSize <- baseFont
             | _ -> ()
         else
             // Watch mode: seat 0 occupies the bottom, face-up like the rest
@@ -1255,6 +1274,20 @@ module GameScreen =
 
             let modal = captureModal gs.Variant screen.Config.Settings.StrictRules options page screenW screenH
 
+            // modal text at the modal scale, shrunk only if the widest option
+            // label would not fit its row
+            let baseFont = g.FontSize
+            g.FontSize <- int (float baseFont * modalScale ())
+            let labelWidth (optIdx: int) =
+                captureOptionSegments (optIdx - modal.PageStart + 1) options[optIdx].Captured
+                |> List.sumBy (fun (s, _) -> (Gfx.measure g s).X)
+            match modal.OptionButtons with
+            | (_, first) :: _ ->
+                let widest = modal.OptionButtons |> List.map (fun (i, _) -> labelWidth i) |> List.max
+                let room = float (first.Rect.Width - 24)
+                if widest > room then g.FontSize <- int (float g.FontSize * room / widest)
+            | [] -> ()
+
             let headerText = "Choose which cards to capture:"
             let headerSize = Gfx.measure g headerText
             let headerY =
@@ -1270,6 +1303,7 @@ module GameScreen =
             modal.MoreButton |> Option.iter (Button.draw g input)
             modal.PlaceButton |> Option.iter (Button.draw g input)
             modal.CancelButton |> Option.iter (Button.draw g input)
+            g.FontSize <- baseFont
 
         | RoundOver ->
             // label scaled with the button (mobile mode)
