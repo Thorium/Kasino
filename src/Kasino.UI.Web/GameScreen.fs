@@ -375,8 +375,10 @@ module GameScreen =
     let private recentPlaysButton (_screenW: int) =
         Button.create "?" 20 20 120 48 (Color.rgb 60 70 110) Color.White
 
+    /// Round-end "Continue": sized like the menu buttons, so it grows in mobile mode.
     let private continueButton (screenW: int) (screenH: int) =
-        Button.createCentered "Continue" screenW (screenH / 2 + 60) 200 52 (Color.rgb 40 80 140) Color.White
+        let s = CardRenderer.UiScale
+        Button.createCentered "Continue" screenW (screenH / 2 + int (60.0 * s)) (int (220.0 * s)) (int (60.0 * s)) (Color.rgb 40 80 140) Color.White
 
     /// Small "Place Instead" button — offered beside the Play button in
     /// Standard Kasino, where capturing is optional.
@@ -1269,6 +1271,11 @@ module GameScreen =
             modal.PlaceButton |> Option.iter (Button.draw g input)
             modal.CancelButton |> Option.iter (Button.draw g input)
 
-        | RoundOver -> Button.draw g input (continueButton screenW screenH)
+        | RoundOver ->
+            // label scaled with the button (mobile mode)
+            let baseFont = g.FontSize
+            g.FontSize <- int (float baseFont * CardRenderer.UiScale)
+            Button.draw g input (continueButton screenW screenH)
+            g.FontSize <- baseFont
 
         | _ -> ()
