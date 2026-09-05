@@ -1103,7 +1103,8 @@ module GameScreen =
 
         // ── Bottom player label ─────────
         let bottomPlayer = gs.Players[bottomIdx]
-        drawPlayerLabel g bottomPlayer 20 (screenH - 18) Color.LightGreen
+        // text draws downward from y (baseline "top"), so keep a full line above the edge
+        drawPlayerLabel g bottomPlayer 20 (screenH - g.FontSize - 4) Color.LightGreen
 
         // ── Status bar ─────────────────────────────
         // just under the felt (the table is not vertically centred in mobile
