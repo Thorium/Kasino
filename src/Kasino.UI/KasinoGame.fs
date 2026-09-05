@@ -139,7 +139,7 @@ type KasinoGame() as this =
             |> List.filter Directory.Exists
             |> List.tryPick (fun dir ->
                 try Directory.GetFiles(dir, "*.ttf", SearchOption.AllDirectories) |> Array.tryHead
-                with _ -> None)
+                with :? System.IO.IOException | :? System.UnauthorizedAccessException -> None)
 
         let fontPath =
             match preferredFonts |> List.tryFind File.Exists with
