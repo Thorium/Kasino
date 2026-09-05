@@ -1,7 +1,8 @@
 # Kasino - Finnish Card Game
 
 A digital version of the classic Finnish card game Kasino, built with MonoGame.
-There is also [Nu game engine version](https://github.com/Thorium/Nu/tree/finnish-card-game/Projects/Kasino) available.
+There is also [Nu game engine version](https://github.com/Thorium/Nu/tree/finnish-card-game/Projects/Kasino) and
+[Mibo branch](https://github.com/Thorium/Kasino/tree/mibo) available.
 
 **▶ [Play online](https://thorium.github.io/Kasino/)** (browser version, no install needed)
 
