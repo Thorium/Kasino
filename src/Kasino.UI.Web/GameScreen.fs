@@ -424,7 +424,7 @@ module GameScreen =
         let S (v: int) = int (float v * ms)
         let rowH = S 48
         // finger-sized gap between rows in mobile mode
-        let pitch = if ms > 1.0 then rowH + S 16 else 56
+        let pitch = if ms > 1.0 then rowH + S 36 else 56
         let rowW = min (S 450) (screenW - 40)
         let perPage = max 3 ((screenH - S 240) / pitch)
         let pageCount = (options.Length + perPage - 1) / perPage
