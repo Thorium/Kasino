@@ -17,6 +17,14 @@ Play with 2-4 players in any mix of human and AI opponents.
 
 Capture cards from the table by playing a card from your hand whose value matches the sum of one or more table cards. Capture all table cards at once for a bonus sweep.
 
+### Special card values
+
+| Category | Hand | Table |
+|---|---|---|
+| Ace | 14 | 1 |
+| 2 of Spades | 15 | 2 |
+| 10 of Diamonds | 16 | 10 |
+
 ### Scoring (per round)
 
 | Category | Points |
