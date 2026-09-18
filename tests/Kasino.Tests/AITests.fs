@@ -16,7 +16,7 @@ let private defaultCtx: AI.GameContext =
 let ``evaluatePlay should detect capture`` () =
     let hand = { Suit = Hearts; Rank = Five }
     let table = [ { Suit = Spades; Rank = Five } ]
-    let eval = AI.evaluatePlay hand table
+    let eval = AI.evaluatePlay table hand
     Assert.True(eval.CardsCaptured > 0)
     Assert.True(eval.IsSweep)
     Assert.True(eval.PointValue > 0.0)
@@ -25,7 +25,7 @@ let ``evaluatePlay should detect capture`` () =
 let ``evaluatePlay should detect placement`` () =
     let hand = { Suit = Hearts; Rank = King }
     let table = [ { Suit = Spades; Rank = Two } ]
-    let eval = AI.evaluatePlay hand table
+    let eval = AI.evaluatePlay table hand
     Assert.Equal(0, eval.CardsCaptured)
     Assert.False(eval.IsSweep)
     Assert.Equal(0.0, eval.PointValue)

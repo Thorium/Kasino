@@ -1277,7 +1277,7 @@ module GameScreen =
                     centerX + int xOff,
                     centerY + int (yStack + interleaveY),
                     cw, ch)
-                sb.Draw(tex, dest, System.Nullable(), Color.White, 0.0f, origin, SpriteEffects.None, 0.0f)
+                sb.Draw(tex, dest, Nullable(), Color.White, 0.0f, origin, SpriteEffects.None, 0.0f)
         | _ -> ()
 
         // ── Deal animation (cards slide from deck to destinations) ──
@@ -1301,14 +1301,14 @@ module GameScreen =
                 let x = deckX + (destX - deckX) * eased
                 let y = deckY + (destY - deckY) * eased
                 let dest = Rectangle(int x, int y, cw, ch)
-                sb.Draw(tex, dest, System.Nullable(), Color.White, 0.0f, origin, SpriteEffects.None, 0.0f)
+                sb.Draw(tex, dest, Nullable(), Color.White, 0.0f, origin, SpriteEffects.None, 0.0f)
             // Also draw remaining deck cards as a stack at deck position
             let remainingSteps = List.length steps - step
             let stackCards = min 3 remainingSteps
             for si in 0 .. stackCards - 1 do
                 let offset = float32 si * -2.0f
                 let dest = Rectangle(int deckX, int (deckY + offset), cw, ch)
-                sb.Draw(tex, dest, System.Nullable(), Color.White, 0.0f, origin, SpriteEffects.None, 0.0f)
+                sb.Draw(tex, dest, Nullable(), Color.White, 0.0f, origin, SpriteEffects.None, 0.0f)
         | _ -> ()
 
         // ── Card movement animation (drawn on top of everything else) ──

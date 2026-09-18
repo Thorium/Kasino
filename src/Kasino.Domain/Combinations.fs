@@ -19,7 +19,7 @@ module Combinations =
     /// Find subsets of items whose values sum exactly to target, up to
     /// maxSubsets of them. Each item is (index, value). Returns list of
     /// index-lists in include-first depth-first order.
-    let findExactSubsets (items: (int * int) list) (target: int) : int list list =
+    let findExactSubsets (target: int) (items: (int * int) list) : int list list =
         let results = ResizeArray<int list>()
         let rec search remaining target acc =
             if results.Count < maxSubsets then
@@ -43,7 +43,7 @@ module Combinations =
             let indexed =
                 tableCards
                 |> List.mapi (fun i c -> (i, Cards.tableValue c.Rank))
-            let subsets = findExactSubsets indexed target
+            let subsets = findExactSubsets target indexed
             subsets
             |> List.map (fun indices ->
                 indices |> List.map (fun i -> tableCards[i]))
