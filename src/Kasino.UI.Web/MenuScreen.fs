@@ -158,12 +158,12 @@ module MenuScreen =
             drawButtons (variantButtons screenW)
         | PlayerCountSelect ->
             let vName = match state.Variant with StandardKasino -> "Standard" | LaistoKasino -> "Laisto"
-            drawCentered ($"Variant: %s{vName}") 140 Color.Gold
+            drawCentered $"Variant: %s{vName}" 140 Color.Gold
             drawCentered "Number of players:" 180 Color.LightGray
             drawButtons (playerCountButtons screenW)
         | HumanCountSelect ->
             let vName = match state.Variant with StandardKasino -> "Standard" | LaistoKasino -> "Laisto"
-            drawCentered ($"Variant: %s{vName}  |  Players: %d{state.PlayerCount}") 140 Color.Gold
+            drawCentered $"Variant: %s{vName}  |  Players: %d{state.PlayerCount}" 140 Color.Gold
             drawCentered "How many human players?" 180 Color.LightGray
             drawButtons (humanCountButtons screenW)
         | Ready

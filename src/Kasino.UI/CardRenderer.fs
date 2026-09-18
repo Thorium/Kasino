@@ -302,7 +302,7 @@ module CardRenderer =
         let h = scaledHeight()
         let origin = Vector2(float32 tex.Width / 2.0f, float32 tex.Height / 2.0f)
         let dest = Rectangle(x + w / 2, y + h / 2, w, h)
-        sb.Draw(tex, dest, System.Nullable(), Color.White, rotation, origin, SpriteEffects.None, 0.0f)
+        sb.Draw(tex, dest, Nullable(), Color.White, rotation, origin, SpriteEffects.None, 0.0f)
 
     /// Draw a card with overlay and rotation
     let drawCardWithOverlayRotated (sb: SpriteBatch) (textures: CardTextures) (card: Card) (x: int) (y: int) (overlayColor: Color) (rotation: float32) =
@@ -312,4 +312,4 @@ module CardRenderer =
         let h = scaledHeight()
         let origin = Vector2(0.5f, 0.5f)
         let dest = Rectangle(x + w / 2, y + h / 2, w, h)
-        sb.Draw(whiteTex, dest, System.Nullable(), overlayColor, rotation, origin, SpriteEffects.None, 0.0f)
+        sb.Draw(whiteTex, dest, Nullable(), overlayColor, rotation, origin, SpriteEffects.None, 0.0f)
