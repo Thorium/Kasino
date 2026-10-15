@@ -240,11 +240,15 @@ module GameScreen =
 
     /// Get the table area rectangle.
     /// Horizontal margins leave room for potential side-opponent hands (3-4 player games).
-    let private tableArea (screenW: int) (screenH: int) =
-        let ch = CardRenderer.scaledHeight ()
-        let cw = CardRenderer.scaledWidth ()
+    /// The table area for cards drawn at `scale`.
+    let private tableAreaAt (scale: float32) (screenW: int) (screenH: int) =
+        let ch = int (float32 CardRenderer.CardHeight * scale)
+        let cw = int (float32 CardRenderer.CardWidth * scale)
         let sideMargin = cw + 30 // room for one card column + gap on each side
         Rectangle(sideMargin, ch + 60, screenW - 2 * sideMargin, screenH - 2 * ch - 140)
+
+    let private tableArea (screenW: int) (screenH: int) =
+        tableAreaAt CardRenderer.Scale screenW screenH
 
     /// Compute scattered positions for table cards.
     /// Cards are placed center-outward: the first card lands near the middle
@@ -352,10 +356,11 @@ module GameScreen =
         let y = max (area.Y + ch / 2) (min (area.Y + area.Height - ch / 2) cy)
         (x, y)
 
-    /// Move scattered table cards from the table area of one screen size to the
-    /// same relative spots in another's (F11 changes the size mid-game).
-    let rescaleScatter (oldW: int) (oldH: int) (newW: int) (newH: int) (screen: ScreenState) =
-        let a = tableArea oldW oldH
+    /// Move scattered table cards from the table area of one screen size (cards
+    /// drawn at `oldScale`) to the same relative spots in the table area at the
+    /// current size and CardRenderer.Scale (F11 changes both mid-game).
+    let rescaleScatter (oldW: int) (oldH: int) (oldScale: float32) (newW: int) (newH: int) (screen: ScreenState) =
+        let a = tableAreaAt oldScale oldW oldH
         let b = tableArea newW newH
 
         let along (from: int) (fromLen: int) (onto: int) (ontoLen: int) (v: int) =

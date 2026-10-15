@@ -388,7 +388,7 @@ type KasinoGame() as this =
         // lay out for the display's real shape (a hardware mode switch would
         // pick a 4:3 mode, stretched on a wide screen).
         if input.Keyboard.IsF11Pressed then
-            let oldW, oldH = screenW (), screenH ()
+            let oldW, oldH, oldScale = screenW (), screenH (), CardRenderer.Scale
 
             if graphics.IsFullScreen then
                 graphics.IsFullScreen <- false
@@ -404,10 +404,15 @@ type KasinoGame() as this =
             graphics.ApplyChanges()
             CardRenderer.Scale <- float32 (screenH ()) / 768.0f * 1.0f
 
-            match screen with
-            | Playing gameState ->
-                screen <- Playing(GameScreen.rescaleScatter oldW oldH (screenW ()) (screenH ()) gameState)
-            | _ -> ()
+            // table cards keep their place on the table, also under an overlay
+            let rec rescale s =
+                match s with
+                | Playing gameState -> Playing(GameScreen.rescaleScatter oldW oldH oldScale (screenW ()) (screenH ()) gameState)
+                | Rules(r, back) -> Rules(r, rescale back)
+                | Options(o, back) -> Options(o, rescale back)
+                | other -> other
+
+            screen <- rescale screen
 
         base.Update gameTime
 
