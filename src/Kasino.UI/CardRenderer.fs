@@ -17,7 +17,8 @@ open Kasino.Domain
 module CardRenderer =
 
     [<Literal>]
-    let CardWidth  = 75
+    let CardWidth = 75
+
     [<Literal>]
     let CardHeight = 95
 
@@ -25,23 +26,33 @@ module CardRenderer =
     let mutable Scale = 1.0f
 
     /// Scaled card dimensions
-    let scaledWidth  () = int (float32 CardWidth  * Scale)
+    let scaledWidth () = int (float32 CardWidth * Scale)
     let scaledHeight () = int (float32 CardHeight * Scale)
 
     /// Map a domain Suit to its file prefix
-    let private suitPrefix = function
-        | Spades   -> "sp"
-        | Hearts   -> "he"
+    let private suitPrefix =
+        function
+        | Spades -> "sp"
+        | Hearts -> "he"
         | Diamonds -> "di"
-        | Clubs    -> "cl"
+        | Clubs -> "cl"
 
     /// Map a domain Rank to its file suffix
-    let private rankSuffix = function
-        | Ace   -> "1"   | Two   -> "2"   | Three -> "3"
-        | Four  -> "4"   | Five  -> "5"   | Six   -> "6"
-        | Seven -> "7"   | Eight -> "8"   | Nine  -> "9"
-        | Ten   -> "10"  | Jack  -> "j"   | Queen -> "q"
-        | King  -> "k"
+    let private rankSuffix =
+        function
+        | Ace -> "1"
+        | Two -> "2"
+        | Three -> "3"
+        | Four -> "4"
+        | Five -> "5"
+        | Six -> "6"
+        | Seven -> "7"
+        | Eight -> "8"
+        | Nine -> "9"
+        | Ten -> "10"
+        | Jack -> "j"
+        | Queen -> "q"
+        | King -> "k"
 
     /// Build filename for a card (e.g. "sp1.png" for Ace of Spades)
     let cardFilename (card: Card) =
@@ -54,13 +65,15 @@ module CardRenderer =
 
     /// All card textures keyed by (Suit, Rank)
     type CardTextures =
-        { Cards: Map<Suit * Rank, Texture2D>
-          mutable Back: Texture2D      // currently active deck image (one of Backs)
-          mutable HandBack: Texture2D  // single card back for face-down hand cards (matches Back)
-          Backs: Texture2D[]           // available deck designs (scenic photos with stacked edges)
-          HandBacks: Texture2D[]       // the single-card back of each design (parallel to Backs)
-          Highlight: Texture2D     // yellow highlight border
-          TableBg: Texture2D }     // green felt
+        {
+            Cards: Map<Suit * Rank, Texture2D>
+            mutable Back: Texture2D // currently active deck image (one of Backs)
+            mutable HandBack: Texture2D // single card back for face-down hand cards (matches Back)
+            Backs: Texture2D[] // available deck designs (scenic photos with stacked edges)
+            HandBacks: Texture2D[] // the single-card back of each design (parallel to Backs)
+            Highlight: Texture2D // yellow highlight border
+            TableBg: Texture2D
+        } // green felt
 
     /// Create a 1x1 colored texture (utility)
     let createColorTexture (device: GraphicsDevice) (color: Color) =
@@ -75,12 +88,14 @@ module CardRenderer =
 
         // Fill with dark navy blue base
         let baseBg = Color(25, 25, 80)
+
         for i in 0 .. pixels.Length - 1 do
             pixels[i] <- baseBg
 
         // Draw border (2px gold/amber frame)
         let borderColor = Color(180, 140, 60)
         let innerBorder = Color(120, 90, 40)
+
         for x in 0 .. w - 1 do
             for y in 0 .. h - 1 do
                 if x < 2 || x >= w - 2 || y < 2 || y >= h - 2 then
@@ -89,17 +104,19 @@ module CardRenderer =
                     pixels[y * w + x] <- innerBorder
 
         // Diamond lattice pattern inside the border area
-        let patternColor1 = Color(60, 40, 140)      // purple-blue diamonds
-        let patternColor2 = Color(140, 50, 50)       // dark red accents
-        let dotColor = Color(200, 160, 60)            // gold dots at intersections
+        let patternColor1 = Color(60, 40, 140) // purple-blue diamonds
+        let patternColor2 = Color(140, 50, 50) // dark red accents
+        let dotColor = Color(200, 160, 60) // gold dots at intersections
 
         for x in 5 .. w - 6 do
             let dx = (x - 5) % 8
+
             for y in 5 .. h - 6 do
                 // Diamond grid pattern with 8px spacing
                 let dy = (y - 5) % 8
                 // Diamond shape: |dx - 4| + |dy - 4| == 3
-                let dist = abs(dx - 4) + abs(dy - 4)
+                let dist = abs (dx - 4) + abs (dy - 4)
+
                 if dist = 3 then
                     pixels[y * w + x] <- patternColor1
                 elif dist = 2 then
@@ -113,14 +130,16 @@ module CardRenderer =
 
         // Center emblem: small diamond shape
         let cx, cy = w / 2, h / 2
+
         for x in cx - 8 .. cx + 8 do
             for y in cy - 8 .. cy + 8 do
                 if x >= 5 && x < w - 5 && y >= 5 && y < h - 5 then
-                    let dist = abs(x - cx) + abs(y - cy)
+                    let dist = abs (x - cx) + abs (y - cy)
+
                     if dist <= 6 && dist >= 4 then
-                        pixels[y * w + x] <- Color(220, 180, 70)  // gold diamond outline
+                        pixels[y * w + x] <- Color(220, 180, 70) // gold diamond outline
                     elif dist < 4 then
-                        pixels[y * w + x] <- Color(160, 40, 40)   // red center
+                        pixels[y * w + x] <- Color(160, 40, 40) // red center
 
         let tex = new Texture2D(device, w, h)
         tex.SetData pixels
@@ -130,7 +149,7 @@ module CardRenderer =
     let private generateFeltTexture (device: GraphicsDevice) =
         let w, h = 128, 128
         let pixels = Array.create (w * h) Color.Transparent
-        let rng = Random(42)  // deterministic seed for consistency
+        let rng = Random(42) // deterministic seed for consistency
 
         for x in 0 .. w - 1 do
             for y in 0 .. h - 1 do
@@ -143,6 +162,7 @@ module CardRenderer =
                 // Horizontal fiber lines: subtle brightness variation every 2-3 pixels
                 let hFiber =
                     let row = y % 4
+
                     match row with
                     | 0 -> -3
                     | 2 -> 2
@@ -151,6 +171,7 @@ module CardRenderer =
                 // Vertical fiber lines: fainter cross-weave
                 let vFiber =
                     let col = x % 6
+
                     match col with
                     | 0 -> -2
                     | 3 -> 1
@@ -159,6 +180,7 @@ module CardRenderer =
                 // Diagonal weave pattern: very subtle, every 8px
                 let weave =
                     let d = (x + y) % 8
+
                     match d with
                     | 0 -> -2
                     | 4 -> 1
@@ -186,18 +208,24 @@ module CardRenderer =
         let cardsDir = Path.Combine(contentDir, "cards", Settings.CardStyle.folder style)
 
         let cardMap =
-            [ for suit in Cards.allSuits do
-                for rank in Cards.allRanks do
-                    let filename = cardFilename { Suit = suit; Rank = rank }
-                    let path = Path.Combine(cardsDir, filename)
-                    if File.Exists(path) then
-                        yield ((suit, rank), loadTexture device path) ]
+            [
+                for suit in Cards.allSuits do
+                    for rank in Cards.allRanks do
+                        let filename = cardFilename { Suit = suit; Rank = rank }
+                        let path = Path.Combine(cardsDir, filename)
+
+                        if File.Exists(path) then
+                            yield ((suit, rank), loadTexture device path)
+            ]
             |> Map.ofList
 
         let defaultBack =
             let backPath = Path.Combine(cardsDir, "back.png")
-            if File.Exists(backPath) then loadTexture device backPath
-            else generateCardBack device
+
+            if File.Exists(backPath) then
+                loadTexture device backPath
+            else
+                generateCardBack device
 
         // Scenic deck designs (back1.png, back2.png, …) carried over from the
         // original 2002 deck, each with its single-card hand back
@@ -205,13 +233,21 @@ module CardRenderer =
         // is chosen per game; with none present we fall back to back.png or
         // the procedural pattern for both.
         let scenicBacks =
-            [ 1 .. 9 ]
+            [ 1..9 ]
             |> List.choose (fun i ->
                 let pile = Path.Combine(cardsDir, $"back%d{i}.png")
                 let single = Path.Combine(cardsDir, $"handback%d{i}.png")
+
                 if File.Exists(pile) then
-                    Some(loadTexture device pile, (if File.Exists(single) then loadTexture device single else defaultBack))
-                else None)
+                    Some(
+                        loadTexture device pile,
+                        (if File.Exists(single) then
+                             loadTexture device single
+                         else
+                             defaultBack)
+                    )
+                else
+                    None)
 
         let backs, handBacks =
             match scenicBacks with
@@ -219,15 +255,26 @@ module CardRenderer =
             | xs -> List.map fst xs |> List.toArray, List.map snd xs |> List.toArray
 
         let tableBgPath = Path.Combine(contentDir, "cards", "table_bg.png")
+
         let tableBg =
-            if File.Exists(tableBgPath) then loadTexture device tableBgPath
-            else generateFeltTexture device
+            if File.Exists(tableBgPath) then
+                loadTexture device tableBgPath
+            else
+                generateFeltTexture device
 
         let highlight = createColorTexture device (Color(255, 255, 0, 128))
 
         // The scenic backN images are deck-pile art (stacked edges baked in);
         // face-down cards in hands use the matching plain single-card back.
-        { Cards = cardMap; Back = backs[0]; HandBack = handBacks[0]; Backs = backs; HandBacks = handBacks; Highlight = highlight; TableBg = tableBg }
+        {
+            Cards = cardMap
+            Back = backs[0]
+            HandBack = handBacks[0]
+            Backs = backs
+            HandBacks = handBacks
+            Highlight = highlight
+            TableBg = tableBg
+        }
 
     /// Load every deck style up front (a deck is 56 small PNGs) so the
     /// Options screen can preview and switch styles without reloading.
@@ -239,7 +286,9 @@ module CardRenderer =
     /// Select deck design i for the game: deck pile and hand back together.
     let selectBack (i: int) (textures: CardTextures) =
         if textures.Backs.Length > 0 then
-            let i = ((i % textures.Backs.Length) + textures.Backs.Length) % textures.Backs.Length
+            let i =
+                ((i % textures.Backs.Length) + textures.Backs.Length) % textures.Backs.Length
+
             textures.Back <- textures.Backs[i]
             textures.HandBack <- textures.HandBacks[i]
 
@@ -252,25 +301,27 @@ module CardRenderer =
     let getTexture (textures: CardTextures) (card: Card) =
         match Map.tryFind (card.Suit, card.Rank) textures.Cards with
         | Some tex -> tex
-        | None     -> textures.HandBack
+        | None -> textures.HandBack
 
     /// Draw a card at a position
     let drawCard (sb: SpriteBatch) (textures: CardTextures) (card: Card) (x: int) (y: int) =
         let tex = getTexture textures card
-        let dest = Rectangle(x, y, scaledWidth(), scaledHeight())
+        let dest = Rectangle(x, y, scaledWidth (), scaledHeight ())
         sb.Draw(tex, dest, Color.White)
 
     /// Draw a face-down card (single card back, not the deck image)
     let drawCardBack (sb: SpriteBatch) (textures: CardTextures) (x: int) (y: int) =
-        let dest = Rectangle(x, y, scaledWidth(), scaledHeight())
+        let dest = Rectangle(x, y, scaledWidth (), scaledHeight ())
         sb.Draw(textures.HandBack, dest, Color.White)
 
     /// Cache for per-frame color textures to avoid GPU memory leak
-    let private colorTextureCache = System.Collections.Generic.Dictionary<uint32, Texture2D>()
+    let private colorTextureCache =
+        System.Collections.Generic.Dictionary<uint32, Texture2D>()
 
     /// Get or create a cached 1x1 color texture (avoids allocating every frame)
     let getCachedColorTexture (device: GraphicsDevice) (color: Color) =
         let key = color.PackedValue
+
         match colorTextureCache.TryGetValue key with
         | true, tex -> tex
         | false, _ ->
@@ -279,9 +330,19 @@ module CardRenderer =
             tex
 
     /// Draw a card with a highlight border (for selection)
-    let drawCardHighlighted (sb: SpriteBatch) (textures: CardTextures) (card: Card) (x: int) (y: int) (borderColor: Color) =
+    let drawCardHighlighted
+        (sb: SpriteBatch)
+        (textures: CardTextures)
+        (card: Card)
+        (x: int)
+        (y: int)
+        (borderColor: Color)
+        =
         let bw = 3
-        let borderRect = Rectangle(x - bw, y - bw, scaledWidth() + bw * 2, scaledHeight() + bw * 2)
+
+        let borderRect =
+            Rectangle(x - bw, y - bw, scaledWidth () + bw * 2, scaledHeight () + bw * 2)
+
         let borderTex = getCachedColorTexture sb.GraphicsDevice borderColor
         sb.Draw(borderTex, borderRect, Color.White)
         drawCard sb textures card x y
@@ -289,27 +350,42 @@ module CardRenderer =
     /// Draw a card with a capture preview overlay.
     /// Uses a white pixel texture with overlayColor as tint to avoid
     /// premultiplied-alpha squaring (color in texture * color in tint).
-    let drawCardWithOverlay (sb: SpriteBatch) (textures: CardTextures) (card: Card) (x: int) (y: int) (overlayColor: Color) =
+    let drawCardWithOverlay
+        (sb: SpriteBatch)
+        (textures: CardTextures)
+        (card: Card)
+        (x: int)
+        (y: int)
+        (overlayColor: Color)
+        =
         drawCard sb textures card x y
         let whiteTex = getCachedColorTexture sb.GraphicsDevice Color.White
-        let dest = Rectangle(x, y, scaledWidth(), scaledHeight())
+        let dest = Rectangle(x, y, scaledWidth (), scaledHeight ())
         sb.Draw(whiteTex, dest, overlayColor)
 
     /// Draw a card at a position with rotation (angle in radians)
     let drawCardRotated (sb: SpriteBatch) (textures: CardTextures) (card: Card) (x: int) (y: int) (rotation: float32) =
         let tex = getTexture textures card
-        let w = scaledWidth()
-        let h = scaledHeight()
+        let w = scaledWidth ()
+        let h = scaledHeight ()
         let origin = Vector2(float32 tex.Width / 2.0f, float32 tex.Height / 2.0f)
         let dest = Rectangle(x + w / 2, y + h / 2, w, h)
         sb.Draw(tex, dest, Nullable(), Color.White, rotation, origin, SpriteEffects.None, 0.0f)
 
     /// Draw a card with overlay and rotation
-    let drawCardWithOverlayRotated (sb: SpriteBatch) (textures: CardTextures) (card: Card) (x: int) (y: int) (overlayColor: Color) (rotation: float32) =
+    let drawCardWithOverlayRotated
+        (sb: SpriteBatch)
+        (textures: CardTextures)
+        (card: Card)
+        (x: int)
+        (y: int)
+        (overlayColor: Color)
+        (rotation: float32)
+        =
         drawCardRotated sb textures card x y rotation
         let whiteTex = getCachedColorTexture sb.GraphicsDevice Color.White
-        let w = scaledWidth()
-        let h = scaledHeight()
+        let w = scaledWidth ()
+        let h = scaledHeight ()
         let origin = Vector2(0.5f, 0.5f)
         let dest = Rectangle(x + w / 2, y + h / 2, w, h)
         sb.Draw(whiteTex, dest, Nullable(), overlayColor, rotation, origin, SpriteEffects.None, 0.0f)

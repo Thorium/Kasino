@@ -15,21 +15,21 @@ module Scoring =
 
     /// Score breakdown for one player
     type ScoreBreakdown =
-        { MostCards: int
-          MostSpades: int
-          Aces: int
-          DiamondTen: int
-          SpadeTwo: int
-          Sweeps: int
-          Total: int }
+        {
+            MostCards: int
+            MostSpades: int
+            Aces: int
+            DiamondTen: int
+            SpadeTwo: int
+            Sweeps: int
+            Total: int
+        }
 
     /// Undistributed most-cards / most-spades points. When a category ties,
     /// its round points join the pot and roll into the next round; whoever
     /// then wins the category outright collects the whole pot.
     [<Struct>]
-    type CarryOver =
-        { CardsPool: int
-          SpadesPool: int }
+    type CarryOver = { CardsPool: int; SpadesPool: int }
 
     module CarryOver =
         let zero = { CardsPool = 0; SpadesPool = 0 }
@@ -38,54 +38,94 @@ module Scoring =
     /// most-cards/most-spades pots from earlier tied rounds. Returns the
     /// breakdowns and the pot to carry into the next round.
     let calculateScoresCarry (carry: CarryOver) (players: Player list) : (Player * ScoreBreakdown) list * CarryOver =
-        if List.isEmpty players then [], carry else
+        if List.isEmpty players then
+            [], carry
+        else
 
-        let cardCounts  = players |> List.map (fun p -> p, List.length p.CapturedCards)
-        let spadeCounts = players |> List.map (fun p -> p, p.CapturedCards |> List.filter Cards.isSpade |> List.length)
+            let cardCounts = players |> List.map (fun p -> p, List.length p.CapturedCards)
 
-        let maxCards = cardCounts |> List.map snd |> List.max
-        let uniqueMostCards = (cardCounts |> List.filter (fun (_, c) -> c = maxCards)).Length = 1
+            let spadeCounts =
+                players
+                |> List.map (fun p -> p, p.CapturedCards |> List.filter Cards.isSpade |> List.length)
 
-        let maxSpades = spadeCounts |> List.map snd |> List.max
-        let uniqueMostSpades = (spadeCounts |> List.filter (fun (_, c) -> c = maxSpades)).Length = 1
+            let maxCards = cardCounts |> List.map snd |> List.max
 
-        // This round's category points plus any pot from earlier tied rounds.
-        let cardsPot  = carry.CardsPool + 1
-        let spadesPot = carry.SpadesPool + 2
+            let uniqueMostCards =
+                (cardCounts |> List.filter (fun (_, c) -> c = maxCards)).Length = 1
 
-        // Sweep deduction: subtract the minimum sweep count from everyone
-        // (players is non-empty here — the empty case returned above).
-        let minSweeps = players |> List.map (fun p -> p.Sweeps) |> List.min
+            let maxSpades = spadeCounts |> List.map snd |> List.max
 
-        let breakdowns =
-            players
-            |> List.map (fun player ->
-                let myCards  = List.length player.CapturedCards
-                let mySpades = player.CapturedCards |> List.filter Cards.isSpade |> List.length
+            let uniqueMostSpades =
+                (spadeCounts |> List.filter (fun (_, c) -> c = maxSpades)).Length = 1
 
-                let mostCardsPoints  = if uniqueMostCards  && myCards  = maxCards  then cardsPot  else 0
-                let mostSpadesPoints = if uniqueMostSpades && mySpades = maxSpades then spadesPot else 0
-                let acePoints        = player.CapturedCards |> List.filter Cards.isAce |> List.length
-                let diamondTenPts    = if player.CapturedCards |> List.exists Cards.isDiamondTen then 2 else 0
-                let spadeTwoPts      = if player.CapturedCards |> List.exists Cards.isSpadeTwo then 1 else 0
-                let sweepPts         = player.Sweeps - minSweeps
+            // This round's category points plus any pot from earlier tied rounds.
+            let cardsPot = carry.CardsPool + 1
+            let spadesPot = carry.SpadesPool + 2
 
-                let total = mostCardsPoints + mostSpadesPoints + acePoints + diamondTenPts + spadeTwoPts + sweepPts
+            // Sweep deduction: subtract the minimum sweep count from everyone
+            // (players is non-empty here — the empty case returned above).
+            let minSweeps = players |> List.map (fun p -> p.Sweeps) |> List.min
 
-                (player,
-                 { MostCards  = mostCardsPoints
-                   MostSpades = mostSpadesPoints
-                   Aces       = acePoints
-                   DiamondTen = diamondTenPts
-                   SpadeTwo   = spadeTwoPts
-                   Sweeps     = sweepPts
-                   Total      = total }))
+            let breakdowns =
+                players
+                |> List.map (fun player ->
+                    let myCards = List.length player.CapturedCards
+                    let mySpades = player.CapturedCards |> List.filter Cards.isSpade |> List.length
 
-        let nextCarry =
-            { CardsPool  = if uniqueMostCards  then 0 else cardsPot
-              SpadesPool = if uniqueMostSpades then 0 else spadesPot }
+                    let mostCardsPoints =
+                        if uniqueMostCards && myCards = maxCards then
+                            cardsPot
+                        else
+                            0
 
-        breakdowns, nextCarry
+                    let mostSpadesPoints =
+                        if uniqueMostSpades && mySpades = maxSpades then
+                            spadesPot
+                        else
+                            0
+
+                    let acePoints = player.CapturedCards |> List.filter Cards.isAce |> List.length
+
+                    let diamondTenPts =
+                        if player.CapturedCards |> List.exists Cards.isDiamondTen then
+                            2
+                        else
+                            0
+
+                    let spadeTwoPts =
+                        if player.CapturedCards |> List.exists Cards.isSpadeTwo then
+                            1
+                        else
+                            0
+
+                    let sweepPts = player.Sweeps - minSweeps
+
+                    let total =
+                        mostCardsPoints
+                        + mostSpadesPoints
+                        + acePoints
+                        + diamondTenPts
+                        + spadeTwoPts
+                        + sweepPts
+
+                    (player,
+                     {
+                         MostCards = mostCardsPoints
+                         MostSpades = mostSpadesPoints
+                         Aces = acePoints
+                         DiamondTen = diamondTenPts
+                         SpadeTwo = spadeTwoPts
+                         Sweeps = sweepPts
+                         Total = total
+                     }))
+
+            let nextCarry =
+                {
+                    CardsPool = if uniqueMostCards then 0 else cardsPot
+                    SpadesPool = if uniqueMostSpades then 0 else spadesPot
+                }
+
+            breakdowns, nextCarry
 
     /// Calculate scores for a single round with no carried pot (ties simply
     /// award nothing). Kept for callers without cross-round state.

@@ -21,35 +21,46 @@ module MenuScreen =
         | ShowOptions
 
     type MenuState =
-        { Step: MenuChoice
-          Variant: GameVariant
-          PlayerCount: int
-          HumanCount: int }
+        {
+            Step: MenuChoice
+            Variant: GameVariant
+            PlayerCount: int
+            HumanCount: int
+        }
 
     let initial =
-        { Step = VariantSelect
-          Variant = StandardKasino
-          PlayerCount = 2
-          HumanCount = 1 }
+        {
+            Step = VariantSelect
+            Variant = StandardKasino
+            PlayerCount = 2
+            HumanCount = 1
+        }
 
     // ── Button definitions (recomputed each frame) ──────────
 
     let private variantButtons (screenW: int) =
-        [ Button.createCentered "Standard Kasino (maximize)" screenW 200 360 52 (Color(40, 100, 40)) Color.White
-          Button.createCentered "Laistokasino (minimize)"    screenW 264 360 52 (Color(140, 60, 40)) Color.White ]
+        [
+            Button.createCentered "Standard Kasino (maximize)" screenW 200 360 52 (Color(40, 100, 40)) Color.White
+            Button.createCentered "Laistokasino (minimize)" screenW 264 360 52 (Color(140, 60, 40)) Color.White
+        ]
 
     let private playerCountButtons (screenW: int) =
         let bw = 180
         let gap = 20
         let totalW = 3 * bw + 2 * gap
         let baseX = (screenW - totalW) / 2
-        [ Button.create "2 Players" baseX              220 bw 52 (Color(40, 80, 120)) Color.White
-          Button.create "3 Players" (baseX + bw + gap) 220 bw 52 (Color(40, 80, 120)) Color.White
-          Button.create "4 Players" (baseX + 2 * (bw + gap)) 220 bw 52 (Color(40, 80, 120)) Color.White ]
+
+        [
+            Button.create "2 Players" baseX 220 bw 52 (Color(40, 80, 120)) Color.White
+            Button.create "3 Players" (baseX + bw + gap) 220 bw 52 (Color(40, 80, 120)) Color.White
+            Button.create "4 Players" (baseX + 2 * (bw + gap)) 220 bw 52 (Color(40, 80, 120)) Color.White
+        ]
 
     let private humanCountButtons (screenW: int) =
-        [ Button.createCentered "Watch AI Only"  screenW 220 320 52 (Color(80, 60, 120)) Color.White
-          Button.createCentered "Play Yourself"  screenW 284 320 52 (Color(40, 120, 80)) Color.White ]
+        [
+            Button.createCentered "Watch AI Only" screenW 220 320 52 (Color(80, 60, 120)) Color.White
+            Button.createCentered "Play Yourself" screenW 284 320 52 (Color(40, 120, 80)) Color.White
+        ]
 
     /// "How to Play" button — visible on all menu steps, positioned near bottom
     let private howToPlayButton (screenW: int) (screenH: int) =
@@ -64,54 +75,116 @@ module MenuScreen =
         // Check "How to Play" / "Options" buttons first — available on all steps
         let helpBtn = howToPlayButton screenW screenH
         let optBtn = optionsButton screenW screenH
+
         if Button.isClicked input helpBtn then
             { state with Step = ShowRules }
         elif Button.isClicked input optBtn then
             { state with Step = ShowOptions }
         else
-        match state.Step with
-        | VariantSelect ->
-            let buttons = variantButtons screenW
-            match Button.findClicked input buttons with
-            | Some 0 -> { state with Variant = StandardKasino; Step = PlayerCountSelect }
-            | Some 1 -> { state with Variant = LaistoKasino;   Step = PlayerCountSelect }
-            | _ ->
-                // Keyboard fallback
-                match input.Keyboard.NumberPressed with
-                | Some 1 -> { state with Variant = StandardKasino; Step = PlayerCountSelect }
-                | Some 2 -> { state with Variant = LaistoKasino;   Step = PlayerCountSelect }
-                | _ -> state
-        | PlayerCountSelect ->
-            let buttons = playerCountButtons screenW
-            match Button.findClicked input buttons with
-            | Some 0 -> { state with PlayerCount = 2; Step = HumanCountSelect }
-            | Some 1 -> { state with PlayerCount = 3; Step = HumanCountSelect }
-            | Some 2 -> { state with PlayerCount = 4; Step = HumanCountSelect }
-            | _ ->
-                match input.Keyboard.NumberPressed with
-                | Some n when n >= 2 && n <= 4 ->
-                    { state with PlayerCount = n; Step = HumanCountSelect }
-                | _ -> state
-        | HumanCountSelect ->
-            let buttons = humanCountButtons screenW
-            match Button.findClicked input buttons with
-            | Some 0 -> { state with HumanCount = 0; Step = Ready }
-            | Some 1 -> { state with HumanCount = 1; Step = Ready }
-            | _ ->
-                match input.Keyboard.NumberPressed with
-                | Some 0 -> { state with HumanCount = 0; Step = Ready }
-                | Some 1 -> { state with HumanCount = 1; Step = Ready }
-                | _ -> state
-        | Ready
-        | ShowRules
-        | ShowOptions -> state
+            match state.Step with
+            | VariantSelect ->
+                let buttons = variantButtons screenW
+
+                match Button.findClicked input buttons with
+                | Some 0 ->
+                    { state with
+                        Variant = StandardKasino
+                        Step = PlayerCountSelect
+                    }
+                | Some 1 ->
+                    { state with
+                        Variant = LaistoKasino
+                        Step = PlayerCountSelect
+                    }
+                | _ ->
+                    // Keyboard fallback
+                    match input.Keyboard.NumberPressed with
+                    | Some 1 ->
+                        { state with
+                            Variant = StandardKasino
+                            Step = PlayerCountSelect
+                        }
+                    | Some 2 ->
+                        { state with
+                            Variant = LaistoKasino
+                            Step = PlayerCountSelect
+                        }
+                    | _ -> state
+            | PlayerCountSelect ->
+                let buttons = playerCountButtons screenW
+
+                match Button.findClicked input buttons with
+                | Some 0 ->
+                    { state with
+                        PlayerCount = 2
+                        Step = HumanCountSelect
+                    }
+                | Some 1 ->
+                    { state with
+                        PlayerCount = 3
+                        Step = HumanCountSelect
+                    }
+                | Some 2 ->
+                    { state with
+                        PlayerCount = 4
+                        Step = HumanCountSelect
+                    }
+                | _ ->
+                    match input.Keyboard.NumberPressed with
+                    | Some n when n >= 2 && n <= 4 ->
+                        { state with
+                            PlayerCount = n
+                            Step = HumanCountSelect
+                        }
+                    | _ -> state
+            | HumanCountSelect ->
+                let buttons = humanCountButtons screenW
+
+                match Button.findClicked input buttons with
+                | Some 0 ->
+                    { state with
+                        HumanCount = 0
+                        Step = Ready
+                    }
+                | Some 1 ->
+                    { state with
+                        HumanCount = 1
+                        Step = Ready
+                    }
+                | _ ->
+                    match input.Keyboard.NumberPressed with
+                    | Some 0 ->
+                        { state with
+                            HumanCount = 0
+                            Step = Ready
+                        }
+                    | Some 1 ->
+                        { state with
+                            HumanCount = 1
+                            Step = Ready
+                        }
+                    | _ -> state
+            | Ready
+            | ShowRules
+            | ShowOptions -> state
 
     /// Draw menu screen with tappable buttons
-    let draw (sb: SpriteBatch) (font: SpriteFontBase) (texOpt: CardRenderer.CardTextures option) (input: InputHandler.InputState) (state: MenuState) (screenW: int) (screenH: int) =
+    let draw
+        (sb: SpriteBatch)
+        (font: SpriteFontBase)
+        (texOpt: CardRenderer.CardTextures option)
+        (input: InputHandler.InputState)
+        (state: MenuState)
+        (screenW: int)
+        (screenH: int)
+        =
         let cx = screenW / 2
+
         let drawCentered (text: string) (y: int) (color: Color) =
             let size = font.MeasureString text
-            sb.DrawString(font, text, Vector2(float32 cx - size.X / 2.0f, float32 y), color) |> ignore
+
+            sb.DrawString(font, text, Vector2(float32 cx - size.X / 2.0f, float32 y), color)
+            |> ignore
 
         drawCentered "KASINO" 40 Color.Gold
         drawCentered "Finnish Card Game" 80 Color.White
@@ -124,11 +197,23 @@ module MenuScreen =
             let drawAce (card: Card) (x: float32) (y: float32) (w: int) (h: int) (rot: float32) =
                 let t = CardRenderer.getTexture tex card
                 let origin = Vector2(float32 t.Width / 2.0f, float32 t.Height / 2.0f)
-                sb.Draw(t, Rectangle(int x, int y, w, h), System.Nullable(), Color.White, rot, origin, SpriteEffects.None, 0.0f)
-            let fanY = float32 ((336 + (screenH - 142)) / 2)     // midpoint of the empty band
+
+                sb.Draw(
+                    t,
+                    Rectangle(int x, int y, w, h),
+                    System.Nullable(),
+                    Color.White,
+                    rot,
+                    origin,
+                    SpriteEffects.None,
+                    0.0f
+                )
+
+            let fanY = float32 ((336 + (screenH - 142)) / 2) // midpoint of the empty band
             let acesFan = [ Spades, -0.30f; Hearts, -0.10f; Diamonds, 0.10f; Clubs, 0.30f ]
+
             for i, (suit, rot) in List.indexed acesFan do
-                let off = float32 i - 1.5f                       // -1.5, -0.5, 0.5, 1.5
+                let off = float32 i - 1.5f // -1.5, -0.5, 0.5, 1.5
                 drawAce { Suit = suit; Rank = Ace } (float32 cx + off * 54.0f) (fanY + abs off * 9.0f) 60 76 rot
         | None -> ()
 
@@ -138,23 +223,34 @@ module MenuScreen =
             Button.drawAll sb font input (variantButtons screenW)
 
         | PlayerCountSelect ->
-            let vName = match state.Variant with StandardKasino -> "Standard" | LaistoKasino -> "Laisto"
+            let vName =
+                match state.Variant with
+                | StandardKasino -> "Standard"
+                | LaistoKasino -> "Laisto"
+
             drawCentered $"Variant: {vName}" 140 Color.Gold
             drawCentered "Number of players:" 180 Color.LightGray
             Button.drawAll sb font input (playerCountButtons screenW)
 
         | HumanCountSelect ->
-            let vName = match state.Variant with StandardKasino -> "Standard" | LaistoKasino -> "Laisto"
+            let vName =
+                match state.Variant with
+                | StandardKasino -> "Standard"
+                | LaistoKasino -> "Laisto"
+
             drawCentered $"Variant: {vName}  |  Players: {state.PlayerCount}" 140 Color.Gold
             drawCentered "How many human players?" 180 Color.LightGray
             Button.drawAll sb font input (humanCountButtons screenW)
 
         | Ready
-        | ShowRules | ShowOptions -> ()   // handled by KasinoGame — should not draw menu in these states
+        | ShowRules
+        | ShowOptions -> () // handled by KasinoGame — should not draw menu in these states
 
         // "Options" / "How to Play" buttons visible on all non-transitional steps
         match state.Step with
-        | Ready | ShowRules | ShowOptions -> ()
+        | Ready
+        | ShowRules
+        | ShowOptions -> ()
         | _ ->
             Button.draw sb font input (optionsButton screenW screenH)
             Button.draw sb font input (howToPlayButton screenW screenH)

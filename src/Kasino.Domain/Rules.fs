@@ -10,8 +10,10 @@ module Rules =
 
     /// A capture option: one valid way to capture cards.
     type CaptureOption =
-        { Combos: Card list list   // non-overlapping combo groups
-          Captured: Card list }     // union of all combos
+        {
+            Combos: Card list list // non-overlapping combo groups
+            Captured: Card list
+        } // union of all combos
 
     /// Find all subsets of table cards that sum to the hand card's value.
     let findCaptures (handCard: Card) (tableCards: Card list) : Card list list =
@@ -27,7 +29,9 @@ module Rules =
     /// Uses Bron-Kerbosch on the conflict graph.
     let findCaptureOptions (handCard: Card) (tableCards: Card list) : CaptureOption list =
         let allCombos = findCaptures handCard tableCards
-        if List.isEmpty allCombos then []
+
+        if List.isEmpty allCombos then
+            []
         else
             let arr = Array.ofList allCombos
             let n = arr.Length
@@ -35,8 +39,11 @@ module Rules =
             // Precompute conflict sets
             let conflicts =
                 Array.init n (fun i ->
-                    [ for j in 0 .. n - 1 do
-                        if i <> j && combosOverlap arr[i] arr[j] then j ]
+                    [
+                        for j in 0 .. n - 1 do
+                            if i <> j && combosOverlap arr[i] arr[j] then
+                                j
+                    ]
                     |> Set.ofList)
 
             let results = System.Collections.Generic.List<int list>()
@@ -49,12 +56,14 @@ module Rules =
 
             // Bron-Kerbosch: maximal independent sets in the conflict graph
             let rec bronKerbosch (r: Set<int>) (p: Set<int>) (x: Set<int>) =
-                if results.Count >= maxOptions then ()
+                if results.Count >= maxOptions then
+                    ()
                 elif Set.isEmpty p && Set.isEmpty x then
                     results.Add(Set.toList r)
                 else
                     let mutable pMut = p
                     let mutable xMut = x
+
                     for v in Set.toList p do
                         if results.Count < maxOptions then
                             let nbrs = conflicts[v]
@@ -81,8 +90,7 @@ module Rules =
         match findCaptureOptions handCard tableCards with
         | [] -> []
         | [ single ] -> single.Captured
-        | multiple ->
-            (multiple |> List.maxBy (fun opt -> opt.Captured.Length)).Captured
+        | multiple -> (multiple |> List.maxBy (fun opt -> opt.Captured.Length)).Captured
 
     /// Check if playing a card results in a capture.
     let canCapture (handCard: Card) (tableCards: Card list) =
@@ -91,11 +99,13 @@ module Rules =
     /// Determine the result of playing a hand card on the table.
     let playCard (handCard: Card) (tableCards: Card list) : PlayResult * Card list * CaptureOption list =
         let options = findCaptureOptions handCard tableCards
+
         match options with
-        | [] ->
-            (Place handCard, handCard :: tableCards, [])
+        | [] -> (Place handCard, handCard :: tableCards, [])
         | [ single ] ->
-            let newTable = tableCards |> List.filter (fun c -> not (List.contains c single.Captured))
+            let newTable =
+                tableCards |> List.filter (fun c -> not (List.contains c single.Captured))
+
             let isSweep = List.isEmpty newTable
             (Capture(handCard, single.Captured, isSweep), newTable, options)
         | _ ->
@@ -103,13 +113,18 @@ module Rules =
             // matching getCapturedCards. (UIs intercept this case and let the
             // player choose; this keeps any direct caller consistent.)
             let chosen = options |> List.maxBy (fun opt -> opt.Captured.Length)
-            let newTable = tableCards |> List.filter (fun c -> not (List.contains c chosen.Captured))
+
+            let newTable =
+                tableCards |> List.filter (fun c -> not (List.contains c chosen.Captured))
+
             let isSweep = List.isEmpty newTable
             (Capture(handCard, chosen.Captured, isSweep), newTable, options)
 
     /// Resolve a specific capture option chosen by the player.
     let resolveCapture (handCard: Card) (option: CaptureOption) (tableCards: Card list) : PlayResult * Card list =
-        let newTable = tableCards |> List.filter (fun c -> not (List.contains c option.Captured))
+        let newTable =
+            tableCards |> List.filter (fun c -> not (List.contains c option.Captured))
+
         let isSweep = List.isEmpty newTable
         (Capture(handCard, option.Captured, isSweep), newTable)
 

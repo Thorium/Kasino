@@ -14,21 +14,27 @@ open Browser.Types
 module Input =
 
     type MouseState =
-        { Position: Point
-          LeftPressed: bool
-          LeftJustClicked: bool
-          RightJustClicked: bool }
+        {
+            Position: Point
+            LeftPressed: bool
+            LeftJustClicked: bool
+            RightJustClicked: bool
+        }
 
     type KeyboardState =
-        { IsEscapePressed: bool
-          IsEnterPressed: bool
-          IsLeftPressed: bool
-          IsRightPressed: bool
-          NumberPressed: int option }
+        {
+            IsEscapePressed: bool
+            IsEnterPressed: bool
+            IsLeftPressed: bool
+            IsRightPressed: bool
+            NumberPressed: int option
+        }
 
     type InputState =
-        { Mouse: MouseState
-          Keyboard: KeyboardState }
+        {
+            Mouse: MouseState
+            Keyboard: KeyboardState
+        }
 
     // ── Accumulated state mutated by event listeners ────────
     let mutable private mouseX = 0
@@ -61,6 +67,7 @@ module Input =
     /// read the synced fields rather than assuming 1024x768.
     let private updatePos (clientX: float) (clientY: float) =
         let rect = canvasEl.getBoundingClientRect ()
+
         if rect.width > 0.0 && rect.height > 0.0 then
             mouseX <- int ((clientX - rect.left) * (logicalW / rect.width))
             mouseY <- int ((clientY - rect.top) * (logicalH / rect.height))
@@ -77,37 +84,58 @@ module Input =
         | "4" -> ValueSome 4
         | _ ->
             match code with
-            | "Digit0" | "Numpad0" -> ValueSome 0
-            | "Digit1" | "Numpad1" -> ValueSome 1
-            | "Digit2" | "Numpad2" -> ValueSome 2
-            | "Digit3" | "Numpad3" -> ValueSome 3
-            | "Digit4" | "Numpad4" -> ValueSome 4
+            | "Digit0"
+            | "Numpad0" -> ValueSome 0
+            | "Digit1"
+            | "Numpad1" -> ValueSome 1
+            | "Digit2"
+            | "Numpad2" -> ValueSome 2
+            | "Digit3"
+            | "Numpad3" -> ValueSome 3
+            | "Digit4"
+            | "Numpad4" -> ValueSome 4
             | _ -> ValueNone
 
     /// Wire up pointer + keyboard listeners against the given canvas.
     let init (canvas: HTMLCanvasElement) =
         canvasEl <- canvas
 
-        canvas.addEventListener ("pointermove", fun e ->
-            let m = e :?> MouseEvent
-            updatePos m.clientX m.clientY)
+        canvas.addEventListener (
+            "pointermove",
+            fun e ->
+                let m = e :?> MouseEvent
+                updatePos m.clientX m.clientY
+        )
 
-        canvas.addEventListener ("pointerdown", fun e ->
-            let m = e :?> MouseEvent
-            updatePos m.clientX m.clientY
-            if m.button = 0 then
-                leftDown <- true
-                leftJust <- true
-            elif m.button = 2 then
-                rightJust <- true
-            // Capture the pointer so a drag keeps receiving move/up events even
-            // when the cursor leaves the canvas bounds (smooth mouse + touch drag).
-            (try canvas?setPointerCapture (e?pointerId) |> ignore with _ -> ())
-            e.preventDefault ())
+        canvas.addEventListener (
+            "pointerdown",
+            fun e ->
+                let m = e :?> MouseEvent
+                updatePos m.clientX m.clientY
 
-        window.addEventListener ("pointerup", fun e ->
-            let m = e :?> MouseEvent
-            if m.button = 0 then leftDown <- false)
+                if m.button = 0 then
+                    leftDown <- true
+                    leftJust <- true
+                elif m.button = 2 then
+                    rightJust <- true
+                // Capture the pointer so a drag keeps receiving move/up events even
+                // when the cursor leaves the canvas bounds (smooth mouse + touch drag).
+                (try
+                    canvas?setPointerCapture (e?pointerId) |> ignore
+                 with _ ->
+                     ())
+
+                e.preventDefault ()
+        )
+
+        window.addEventListener (
+            "pointerup",
+            fun e ->
+                let m = e :?> MouseEvent
+
+                if m.button = 0 then
+                    leftDown <- false
+        )
 
         // A cancelled pointer (touch interrupted, pointer lost, window blur)
         // must release the held button so a drag can't get stuck mid-gesture.
@@ -116,50 +144,66 @@ module Input =
         let release (_: Event) =
             leftDown <- false
             downKeys <- Set.empty
+
         window.addEventListener ("pointercancel", release)
         window.addEventListener ("blur", release)
 
         // Suppress the context menu so right-click can be used as input.
         canvas.addEventListener ("contextmenu", fun e -> e.preventDefault ())
 
-        window.addEventListener ("keydown", fun e ->
-            let k = e :?> KeyboardEvent
-            // Edge-detect: only fire "just pressed" on the down transition,
-            // ignoring auto-repeat while the key is held. Track the physical
-            // key (code), not the logical key string: modifiers can change
-            // the string between press and release (press "3", hold Shift,
-            // release delivers "#"), which would latch the entry forever.
-            let code = k.code
-            if not (Set.contains code downKeys) then
-                downKeys <- Set.add code downKeys
-                match k.key with
-                | "Escape" -> escJust <- true
-                | "Enter" -> enterJust <- true
-                | "ArrowLeft" -> leftKeyJust <- true
-                | "ArrowRight" -> rightKeyJust <- true
-                | key ->
-                    match parseDigit key code with
-                    | ValueSome n -> numberJust <- Some n
-                    | ValueNone -> ())
+        window.addEventListener (
+            "keydown",
+            fun e ->
+                let k = e :?> KeyboardEvent
+                // Edge-detect: only fire "just pressed" on the down transition,
+                // ignoring auto-repeat while the key is held. Track the physical
+                // key (code), not the logical key string: modifiers can change
+                // the string between press and release (press "3", hold Shift,
+                // release delivers "#"), which would latch the entry forever.
+                let code = k.code
 
-        window.addEventListener ("keyup", fun e ->
-            let k = e :?> KeyboardEvent
-            downKeys <- Set.remove k.code downKeys)
+                if not (Set.contains code downKeys) then
+                    downKeys <- Set.add code downKeys
+
+                    match k.key with
+                    | "Escape" -> escJust <- true
+                    | "Enter" -> enterJust <- true
+                    | "ArrowLeft" -> leftKeyJust <- true
+                    | "ArrowRight" -> rightKeyJust <- true
+                    | key ->
+                        match parseDigit key code with
+                        | ValueSome n -> numberJust <- Some n
+                        | ValueNone -> ()
+        )
+
+        window.addEventListener (
+            "keyup",
+            fun e ->
+                let k = e :?> KeyboardEvent
+                downKeys <- Set.remove k.code downKeys
+        )
 
     /// Produce the current frame's input and reset per-frame edge flags.
     let snapshot () : InputState =
         let st =
-            { Mouse =
-                { Position = { X = mouseX; Y = mouseY }
-                  LeftPressed = leftDown
-                  LeftJustClicked = leftJust
-                  RightJustClicked = rightJust }
-              Keyboard =
-                { IsEscapePressed = escJust
-                  IsEnterPressed = enterJust
-                  IsLeftPressed = leftKeyJust
-                  IsRightPressed = rightKeyJust
-                  NumberPressed = numberJust } }
+            {
+                Mouse =
+                    {
+                        Position = { X = mouseX; Y = mouseY }
+                        LeftPressed = leftDown
+                        LeftJustClicked = leftJust
+                        RightJustClicked = rightJust
+                    }
+                Keyboard =
+                    {
+                        IsEscapePressed = escJust
+                        IsEnterPressed = enterJust
+                        IsLeftPressed = leftKeyJust
+                        IsRightPressed = rightKeyJust
+                        NumberPressed = numberJust
+                    }
+            }
+
         leftJust <- false
         rightJust <- false
         escJust <- false
@@ -170,17 +214,23 @@ module Input =
         st
 
     let defaultState: InputState =
-        { Mouse =
-            { Position = Point.Zero
-              LeftPressed = false
-              LeftJustClicked = false
-              RightJustClicked = false }
-          Keyboard =
-            { IsEscapePressed = false
-              IsEnterPressed = false
-              IsLeftPressed = false
-              IsRightPressed = false
-              NumberPressed = None } }
+        {
+            Mouse =
+                {
+                    Position = Point.Zero
+                    LeftPressed = false
+                    LeftJustClicked = false
+                    RightJustClicked = false
+                }
+            Keyboard =
+                {
+                    IsEscapePressed = false
+                    IsEnterPressed = false
+                    IsLeftPressed = false
+                    IsRightPressed = false
+                    NumberPressed = None
+                }
+        }
 
     /// Check if a point is inside a rectangle.
     let hitTest (rect: Rect) (point: Point) = rect.Contains point

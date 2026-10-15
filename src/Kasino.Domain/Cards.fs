@@ -55,11 +55,13 @@ type PlayerType =
 
 /// A player in the game
 type Player =
-    { Name: string
-      Type: PlayerType
-      Hand: Card list
-      CapturedCards: Card list
-      Sweeps: int }
+    {
+        Name: string
+        Type: PlayerType
+        Hand: Card list
+        CapturedCards: Card list
+        Sweeps: int
+    }
 
 /// Result of playing a card
 type PlayResult =
@@ -73,73 +75,97 @@ type PlayResult =
 module Cards =
 
     /// Rank display name
-    let rankName = function
-        | Ace   -> "A"  | Two   -> "2"  | Three -> "3"
-        | Four  -> "4"  | Five  -> "5"  | Six   -> "6"
-        | Seven -> "7"  | Eight -> "8"  | Nine  -> "9"
-        | Ten   -> "10" | Jack  -> "J"  | Queen -> "Q"
-        | King  -> "K"
+    let rankName =
+        function
+        | Ace -> "A"
+        | Two -> "2"
+        | Three -> "3"
+        | Four -> "4"
+        | Five -> "5"
+        | Six -> "6"
+        | Seven -> "7"
+        | Eight -> "8"
+        | Nine -> "9"
+        | Ten -> "10"
+        | Jack -> "J"
+        | Queen -> "Q"
+        | King -> "K"
 
     /// Suit Unicode symbol
-    let suitSymbol = function
-        | Spades   -> "\u2660"
-        | Hearts   -> "\u2665"
+    let suitSymbol =
+        function
+        | Spades -> "\u2660"
+        | Hearts -> "\u2665"
         | Diamonds -> "\u2666"
-        | Clubs    -> "\u2663"
+        | Clubs -> "\u2663"
 
     /// Suit name
-    let suitName = function
-        | Spades   -> "Spades"
-        | Hearts   -> "Hearts"
+    let suitName =
+        function
+        | Spades -> "Spades"
+        | Hearts -> "Hearts"
         | Diamonds -> "Diamonds"
-        | Clubs    -> "Clubs"
+        | Clubs -> "Clubs"
 
     /// Card display string (e.g. "A♠", "10♦")
     let display (card: Card) =
         $"{rankName card.Rank}{suitSymbol card.Suit}"
 
     /// Face value on the table: A=1, 2..10, J=11, Q=12, K=13
-    let tableValue = function
-        | Ace -> 1    | Two -> 2    | Three -> 3  | Four -> 4
-        | Five -> 5   | Six -> 6    | Seven -> 7  | Eight -> 8
-        | Nine -> 9   | Ten -> 10   | Jack -> 11  | Queen -> 12
+    let tableValue =
+        function
+        | Ace -> 1
+        | Two -> 2
+        | Three -> 3
+        | Four -> 4
+        | Five -> 5
+        | Six -> 6
+        | Seven -> 7
+        | Eight -> 8
+        | Nine -> 9
+        | Ten -> 10
+        | Jack -> 11
+        | Queen -> 12
         | King -> 13
 
     /// Capture power from hand: A=14, ♠2=15, ♦10=16, rest=tableValue
     let handValue (card: Card) =
         match card.Suit, card.Rank with
-        | _,        Ace -> 14
-        | Spades,   Two -> 15
+        | _, Ace -> 14
+        | Spades, Two -> 15
         | Diamonds, Ten -> 16
-        | _,        _   -> tableValue card.Rank
+        | _, _ -> tableValue card.Rank
 
-    let isSpade    (c: Card) = c.Suit = Spades
+    let isSpade (c: Card) = c.Suit = Spades
     let isSpadeTwo (c: Card) = c.Suit = Spades && c.Rank = Two
     let isDiamondTen (c: Card) = c.Suit = Diamonds && c.Rank = Ten
-    let isAce      (c: Card) = c.Rank = Ace
+    let isAce (c: Card) = c.Rank = Ace
 
     /// All 13 ranks in order
     let allRanks =
-        [ Ace; Two; Three; Four; Five; Six; Seven
-          Eight; Nine; Ten; Jack; Queen; King ]
+        [ Ace; Two; Three; Four; Five; Six; Seven; Eight; Nine; Ten; Jack; Queen; King ]
 
     /// All 4 suits
     let allSuits = [ Spades; Hearts; Diamonds; Clubs ]
 
     /// Create a full 52-card deck
     let createDeck () =
-        [ for suit in allSuits do
-            for rank in allRanks do
-                { Suit = suit; Rank = rank } ]
+        [
+            for suit in allSuits do
+                for rank in allRanks do
+                    { Suit = suit; Rank = rank }
+        ]
 
     /// Fisher-Yates shuffle
     let shuffle (rng: Random) (deck: Card list) =
         let arr = Array.ofList deck
+
         for i = arr.Length - 1 downto 1 do
             let j = rng.Next(i + 1)
             let tmp = arr[i]
             arr[i] <- arr[j]
             arr[j] <- tmp
+
         Array.toList arr
 
     /// Deal n cards from the top: returns (dealt, remaining)
@@ -181,15 +207,22 @@ module Cards =
     /// Context-aware scoring value of a single card, considering the race for
     /// "most cards/spades". Suitable for ranking individual hand cards.
     let scoringValueInContext
-        (myCards: int) (mySpades: int)
-        (opponentCards: int) (opponentSpades: int)
+        (myCards: int)
+        (mySpades: int)
+        (opponentCards: int)
+        (opponentSpades: int)
         (cardsRemaining: int)
-        (card: Card) : float =
+        (card: Card)
+        : float =
 
         let cardMargin = cardRaceMargin (float (myCards + 1 - opponentCards)) cardsRemaining
+
         let spadeMargin =
-            if isSpade card then spadeRaceMargin (float (mySpades + 1 - opponentSpades)) cardsRemaining
-            else 0.0
+            if isSpade card then
+                spadeRaceMargin (float (mySpades + 1 - opponentSpades)) cardsRemaining
+            else
+                0.0
+
         directValue card + cardMargin + spadeMargin
 
     /// Context-aware value of an entire capture. The "most cards" and "most
@@ -197,16 +230,25 @@ module Cards =
     /// counted ONCE here — based on the totals after the capture — rather than
     /// per captured card, which would multiply a single-point race many times.
     let captureRaceValue
-        (myCards: int) (mySpades: int)
-        (opponentCards: int) (opponentSpades: int)
+        (myCards: int)
+        (mySpades: int)
+        (opponentCards: int)
+        (opponentSpades: int)
         (cardsRemaining: int)
-        (capturedCards: int) (capturedSpades: int) : float =
+        (capturedCards: int)
+        (capturedSpades: int)
+        : float =
 
         // The played hand card also lands in the pile, hence the +1 in the
         // card count. capturedSpades must already include the played card
         // when it is a spade (the caller banks handCard :: captured).
-        let cardMargin = cardRaceMargin (float (myCards + capturedCards + 1 - opponentCards)) cardsRemaining
+        let cardMargin =
+            cardRaceMargin (float (myCards + capturedCards + 1 - opponentCards)) cardsRemaining
+
         let spadeMargin =
-            if capturedSpades > 0 then spadeRaceMargin (float (mySpades + capturedSpades - opponentSpades)) cardsRemaining
-            else 0.0
+            if capturedSpades > 0 then
+                spadeRaceMargin (float (mySpades + capturedSpades - opponentSpades)) cardsRemaining
+            else
+                0.0
+
         cardMargin + spadeMargin

@@ -21,6 +21,7 @@ module Combinations =
     /// index-lists in include-first depth-first order.
     let findExactSubsets (target: int) (items: (int * int) list) : int list list =
         let results = ResizeArray<int list>()
+
         let rec search remaining target acc =
             if results.Count < maxSubsets then
                 match remaining with
@@ -31,20 +32,20 @@ module Combinations =
                     // Branch: include this item or skip it
                     search rest (target - value) (idx :: acc)
                     search rest target acc
+
         search items target []
         List.ofSeq results
 
     /// Find all subsets of cards on the table that sum exactly to
     /// the hand card's capture value. Returns list of card-lists.
     let findCaptureCombinations (handCard: Card) (tableCards: Card list) : Card list list =
-        if List.isEmpty tableCards then []
+        if List.isEmpty tableCards then
+            []
         else
             let target = Cards.handValue handCard
-            let indexed =
-                tableCards
-                |> List.mapi (fun i c -> (i, Cards.tableValue c.Rank))
+            let indexed = tableCards |> List.mapi (fun i c -> (i, Cards.tableValue c.Rank))
             let subsets = findExactSubsets target indexed
+
             subsets
-            |> List.map (fun indices ->
-                indices |> List.map (fun i -> tableCards[i]))
+            |> List.map (fun indices -> indices |> List.map (fun i -> tableCards[i]))
             |> List.filter (List.isEmpty >> not)

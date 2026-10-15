@@ -9,12 +9,14 @@ open Kasino.Domain
 // ─────────────────────────────────────────────────────────────
 
 let private makeConfig variant playerCount humanCount =
-    { GameEngine.Variant = variant
-      GameEngine.Seats = GameEngine.SeatCount.ofIntOrDefault playerCount
-      GameEngine.HumanCount = humanCount
-      GameEngine.Seed = Some 42
-      GameEngine.TargetScore = 16
-      GameEngine.Settings = Settings.defaultSettings }
+    {
+        GameEngine.Variant = variant
+        GameEngine.Seats = GameEngine.SeatCount.ofIntOrDefault playerCount
+        GameEngine.HumanCount = humanCount
+        GameEngine.Seed = Some 42
+        GameEngine.TargetScore = 16
+        GameEngine.Settings = Settings.defaultSettings
+    }
 
 [<Fact>]
 let ``dealRounds should return 6 for 2 players`` () =
@@ -46,25 +48,73 @@ let ``createPlayers should set first player as Human when HumanCount > 0`` () =
 [<Fact>]
 let ``allHandsEmpty should return true when all hands empty`` () =
     let players =
-        [ { Name = "P1"; Type = Computer; Hand = []; CapturedCards = []; Sweeps = 0 }
-          { Name = "P2"; Type = Computer; Hand = []; CapturedCards = []; Sweeps = 0 } ]
+        [
+            {
+                Name = "P1"
+                Type = Computer
+                Hand = []
+                CapturedCards = []
+                Sweeps = 0
+            }
+            {
+                Name = "P2"
+                Type = Computer
+                Hand = []
+                CapturedCards = []
+                Sweeps = 0
+            }
+        ]
+
     let state: GameEngine.GameState =
-        { Players = players; Table = []; Deck = []
-          CurrentPlayerIndex = 0; DealRound = 1; TotalDeals = 6
-          LastCapturer = None; RecentPlays = []; Variant = StandardKasino; SweepsFrozen = false }
+        {
+            Players = players
+            Table = []
+            Deck = []
+            CurrentPlayerIndex = 0
+            DealRound = 1
+            TotalDeals = 6
+            LastCapturer = None
+            RecentPlays = []
+            Variant = StandardKasino
+            SweepsFrozen = false
+        }
+
     Assert.True(GameEngine.allHandsEmpty state)
 
 [<Fact>]
 let ``allHandsEmpty should return false when any hand has cards`` () =
     let players =
-        [ { Name = "P1"; Type = Computer
-            Hand = [ { Suit = Spades; Rank = Ace } ]
-            CapturedCards = []; Sweeps = 0 }
-          { Name = "P2"; Type = Computer; Hand = []; CapturedCards = []; Sweeps = 0 } ]
+        [
+            {
+                Name = "P1"
+                Type = Computer
+                Hand = [ { Suit = Spades; Rank = Ace } ]
+                CapturedCards = []
+                Sweeps = 0
+            }
+            {
+                Name = "P2"
+                Type = Computer
+                Hand = []
+                CapturedCards = []
+                Sweeps = 0
+            }
+        ]
+
     let state: GameEngine.GameState =
-        { Players = players; Table = []; Deck = []
-          CurrentPlayerIndex = 0; DealRound = 1; TotalDeals = 6
-          LastCapturer = None; RecentPlays = []; Variant = StandardKasino; SweepsFrozen = false }
+        {
+            Players = players
+            Table = []
+            Deck = []
+            CurrentPlayerIndex = 0
+            DealRound = 1
+            TotalDeals = 6
+            LastCapturer = None
+            RecentPlays = []
+            Variant = StandardKasino
+            SweepsFrozen = false
+        }
+
     Assert.False(GameEngine.allHandsEmpty state)
 
 [<Fact>]
@@ -120,13 +170,39 @@ let ``playComputerTurn should execute and advance`` () =
 [<Fact>]
 let ``endRound should give remaining table cards to last capturer`` () =
     let table = [ { Suit = Spades; Rank = Five }; { Suit = Hearts; Rank = Three } ]
+
     let players =
-        [ { Name = "P1"; Type = Computer; Hand = []; CapturedCards = [ { Suit = Clubs; Rank = Ace } ]; Sweeps = 0 }
-          { Name = "P2"; Type = Computer; Hand = []; CapturedCards = []; Sweeps = 0 } ]
+        [
+            {
+                Name = "P1"
+                Type = Computer
+                Hand = []
+                CapturedCards = [ { Suit = Clubs; Rank = Ace } ]
+                Sweeps = 0
+            }
+            {
+                Name = "P2"
+                Type = Computer
+                Hand = []
+                CapturedCards = []
+                Sweeps = 0
+            }
+        ]
+
     let state: GameEngine.GameState =
-        { Players = players; Table = table; Deck = []
-          CurrentPlayerIndex = 0; DealRound = 6; TotalDeals = 6
-          LastCapturer = Some 0; RecentPlays = []; Variant = StandardKasino; SweepsFrozen = false }
+        {
+            Players = players
+            Table = table
+            Deck = []
+            CurrentPlayerIndex = 0
+            DealRound = 6
+            TotalDeals = 6
+            LastCapturer = Some 0
+            RecentPlays = []
+            Variant = StandardKasino
+            SweepsFrozen = false
+        }
+
     let final = GameEngine.endRound state
     Assert.Equal(3, final.Players[0].CapturedCards.Length)
     Assert.Empty(final.Table)
@@ -134,13 +210,39 @@ let ``endRound should give remaining table cards to last capturer`` () =
 [<Fact>]
 let ``endRound with no last capturer should leave table unchanged`` () =
     let table = [ { Suit = Spades; Rank = Five } ]
+
     let players =
-        [ { Name = "P1"; Type = Computer; Hand = []; CapturedCards = []; Sweeps = 0 }
-          { Name = "P2"; Type = Computer; Hand = []; CapturedCards = []; Sweeps = 0 } ]
+        [
+            {
+                Name = "P1"
+                Type = Computer
+                Hand = []
+                CapturedCards = []
+                Sweeps = 0
+            }
+            {
+                Name = "P2"
+                Type = Computer
+                Hand = []
+                CapturedCards = []
+                Sweeps = 0
+            }
+        ]
+
     let state: GameEngine.GameState =
-        { Players = players; Table = table; Deck = []
-          CurrentPlayerIndex = 0; DealRound = 6; TotalDeals = 6
-          LastCapturer = None; RecentPlays = []; Variant = StandardKasino; SweepsFrozen = false }
+        {
+            Players = players
+            Table = table
+            Deck = []
+            CurrentPlayerIndex = 0
+            DealRound = 6
+            TotalDeals = 6
+            LastCapturer = None
+            RecentPlays = []
+            Variant = StandardKasino
+            SweepsFrozen = false
+        }
+
     let final = GameEngine.endRound state
     Assert.Equal(1, final.Table.Length)
 
@@ -158,7 +260,14 @@ let ``newRound should create fresh state`` () =
 
 [<Fact>]
 let ``createPlayers uses personality names when AiPersonalities is on`` () =
-    let config = { makeConfig StandardKasino 2 0 with Settings = { Settings.defaultSettings with AiPersonalities = true } }
+    let config =
+        { makeConfig StandardKasino 2 0 with
+            Settings =
+                { Settings.defaultSettings with
+                    AiPersonalities = true
+                }
+        }
+
     let players = GameEngine.createPlayers config
     Assert.Equal(Personality.forCpu(0).Name, players[0].Name)
     Assert.Equal(Personality.forCpu(1).Name, players[1].Name)
@@ -171,22 +280,63 @@ let ``createPlayers uses plain CPU name when AiPersonalities is off`` () =
 
 [<Fact>]
 let ``computerStyle honours personalities for CPU seats`` () =
-    let config = { makeConfig StandardKasino 2 1 with Settings = { Settings.defaultSettings with AiPersonalities = true } }
+    let config =
+        { makeConfig StandardKasino 2 1 with
+            Settings =
+                { Settings.defaultSettings with
+                    AiPersonalities = true
+                }
+        }
+
     Assert.Equal(AI.Balanced, GameEngine.computerStyle config 0)
     Assert.Equal((Personality.forCpu 0).Style, GameEngine.computerStyle config 1)
 
 [<Fact>]
 let ``recent plays keep the other seats' moves since your own`` () =
     let players =
-        [ { Name = "P1"; Type = Human; Hand = [ { Suit = Hearts; Rank = Nine }; { Suit = Clubs; Rank = Five } ]; CapturedCards = []; Sweeps = 0 }
-          { Name = "CPU 1"; Type = Computer; Hand = [ { Suit = Clubs; Rank = Two } ]; CapturedCards = []; Sweeps = 0 }
-          { Name = "CPU 2"; Type = Computer; Hand = [ { Suit = Diamonds; Rank = King } ]; CapturedCards = []; Sweeps = 0 } ]
+        [
+            {
+                Name = "P1"
+                Type = Human
+                Hand = [ { Suit = Hearts; Rank = Nine }; { Suit = Clubs; Rank = Five } ]
+                CapturedCards = []
+                Sweeps = 0
+            }
+            {
+                Name = "CPU 1"
+                Type = Computer
+                Hand = [ { Suit = Clubs; Rank = Two } ]
+                CapturedCards = []
+                Sweeps = 0
+            }
+            {
+                Name = "CPU 2"
+                Type = Computer
+                Hand = [ { Suit = Diamonds; Rank = King } ]
+                CapturedCards = []
+                Sweeps = 0
+            }
+        ]
+
     let state: GameEngine.GameState =
-        { Players = players
-          Table = [ { Suit = Clubs; Rank = Six }; { Suit = Hearts; Rank = Three }; { Suit = Spades; Rank = King } ]
-          Deck = []
-          CurrentPlayerIndex = 0; DealRound = 1; TotalDeals = 6
-          LastCapturer = None; RecentPlays = []; Variant = StandardKasino; SweepsFrozen = false }
+        {
+            Players = players
+            Table =
+                [
+                    { Suit = Clubs; Rank = Six }
+                    { Suit = Hearts; Rank = Three }
+                    { Suit = Spades; Rank = King }
+                ]
+            Deck = []
+            CurrentPlayerIndex = 0
+            DealRound = 1
+            TotalDeals = 6
+            LastCapturer = None
+            RecentPlays = []
+            Variant = StandardKasino
+            SweepsFrozen = false
+        }
+
     Assert.Equal<string list>([ "No moves yet this round" ], GameEngine.describeRecentPlays state)
     // P1: 9♥ takes 6♣ + 3♥ (K♠ stays); CPU 1: 2♣ is placed; CPU 2: K♦ takes K♠
     let s1 = (GameEngine.playHumanTurn state 0 None).NewState

@@ -13,15 +13,15 @@ let ``findExactSubsets should find two combos for target 7`` () =
     let items = [ (0, 2); (1, 5); (2, 3); (3, 4) ]
     let results = Combinations.findExactSubsets 7 items
     Assert.Equal(2, results.Length)
-    Assert.Contains([0; 1], results)  // indices for 2+5
-    Assert.Contains([2; 3], results)  // indices for 3+4
+    Assert.Contains([ 0; 1 ], results) // indices for 2+5
+    Assert.Contains([ 2; 3 ], results) // indices for 3+4
 
 [<Fact>]
 let ``findExactSubsets should find single item match`` () =
     let items = [ (0, 5); (1, 3) ]
     let results = Combinations.findExactSubsets 5 items
     Assert.Equal(1, results.Length)
-    Assert.Contains([0], results)
+    Assert.Contains([ 0 ], results)
 
 [<Fact>]
 let ``findExactSubsets should return empty for no match`` () =
@@ -44,9 +44,14 @@ let ``findExactSubsets should find multiple subsets`` () =
 [<Fact>]
 let ``findCaptureCombinations should find card captures`` () =
     let handCard = { Suit = Hearts; Rank = Seven }
-    let table = [ { Suit = Spades; Rank = Seven }
-                  { Suit = Clubs; Rank = Three }
-                  { Suit = Diamonds; Rank = Four } ]
+
+    let table =
+        [
+            { Suit = Spades; Rank = Seven }
+            { Suit = Clubs; Rank = Three }
+            { Suit = Diamonds; Rank = Four }
+        ]
+
     let combos = Combinations.findCaptureCombinations handCard table
     // Should find: [7♠] and [3♣, 4♦]
     Assert.Equal(2, combos.Length)
@@ -67,8 +72,12 @@ let ``findCaptureCombinations should return empty for empty table`` () =
 [<Fact>]
 let ``findCaptureCombinations should handle Ace with value 14`` () =
     let handCard = { Suit = Hearts; Rank = Ace }
-    let table = [ { Suit = Spades; Rank = King }   // 13
-                  { Suit = Clubs; Rank = Ace } ]     // 1
+
+    let table =
+        [
+            { Suit = Spades; Rank = King } // 13
+            { Suit = Clubs; Rank = Ace }
+        ] // 1
     // Ace hand value = 14; King(13) + Ace(1) = 14
     let combos = Combinations.findCaptureCombinations handCard table
     Assert.True(combos.Length >= 1)

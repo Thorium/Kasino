@@ -16,31 +16,38 @@ module Button =
     /// Minimum touch-friendly dimensions
     [<Literal>]
     let MinTouchHeight = 48
+
     [<Literal>]
     let MinTouchWidth = 120
 
     /// A button definition — stateless, typically recomputed each frame
     type ButtonDef =
-        { Rect: Rectangle
-          Text: string
-          BgColor: Color
-          HoverColor: Color
-          TextColor: Color }
+        {
+            Rect: Rectangle
+            Text: string
+            BgColor: Color
+            HoverColor: Color
+            TextColor: Color
+        }
 
     /// Create a button at a specific position with enforced minimum size
     let create (text: string) (x: int) (y: int) (w: int) (h: int) (bgColor: Color) (textColor: Color) =
         let w = max w MinTouchWidth
         let h = max h MinTouchHeight
-        { Rect = Rectangle(x, y, w, h)
-          Text = text
-          BgColor = bgColor
-          HoverColor =
-              Color(
-                  min 255 (int bgColor.R + 40),
-                  min 255 (int bgColor.G + 40),
-                  min 255 (int bgColor.B + 40),
-                  int bgColor.A)
-          TextColor = textColor }
+
+        {
+            Rect = Rectangle(x, y, w, h)
+            Text = text
+            BgColor = bgColor
+            HoverColor =
+                Color(
+                    min 255 (int bgColor.R + 40),
+                    min 255 (int bgColor.G + 40),
+                    min 255 (int bgColor.B + 40),
+                    int bgColor.A
+                )
+            TextColor = textColor
+        }
 
     /// Create a button centered horizontally at a given y position
     let createCentered (text: string) (screenW: int) (y: int) (w: int) (h: int) (bgColor: Color) (textColor: Color) =
@@ -49,8 +56,7 @@ module Button =
         create text x y w h bgColor textColor
 
     /// Check if the pointer is hovering over the button
-    let isHovered (input: InputHandler.InputState) (btn: ButtonDef) =
-        btn.Rect.Contains input.Mouse.Position
+    let isHovered (input: InputHandler.InputState) (btn: ButtonDef) = btn.Rect.Contains input.Mouse.Position
 
     /// Check if a button was tapped/clicked this frame
     let isClicked (input: InputHandler.InputState) (btn: ButtonDef) =
@@ -81,13 +87,20 @@ module Button =
     /// Draw a button whose label is a list of (text, color) segments rendered
     /// as one centered line. Used where parts of the label carry meaning by
     /// color (e.g. card names tinted by suit in the capture modal).
-    let drawSegmented (sb: SpriteBatch) (font: SpriteFontBase) (input: InputHandler.InputState) (btn: ButtonDef) (segments: (string * Color) list) =
+    let drawSegmented
+        (sb: SpriteBatch)
+        (font: SpriteFontBase)
+        (input: InputHandler.InputState)
+        (btn: ButtonDef)
+        (segments: (string * Color) list)
+        =
         draw sb font input { btn with Text = "" }
         let r = btn.Rect
         let totalW = segments |> List.sumBy (fun (s, _) -> (font.MeasureString s).X)
         let lineH = (font.MeasureString "Ag").Y
         let mutable x = float32 r.X + (float32 r.Width - totalW) / 2.0f
         let ty = float32 r.Y + (float32 r.Height - lineH) / 2.0f
+
         for (s, c) in segments do
             sb.DrawString(font, s, Vector2(x, ty), c) |> ignore
             x <- x + (font.MeasureString s).X

@@ -28,47 +28,63 @@ let mutable screenW = 1024
 let mutable screenH = 768
 
 let mutable private screen: ActiveScreen = Menu MenuScreen.initial
+
 /// Phones and tablets — touch as the primary pointer, or a mobile user agent
 /// (iPadOS Safari claims to be a Mac, but its pointer is coarse) — start with
 /// the screen-optimized deck; desktops start with the original one. This only
 /// picks the initial value; Options can change it. Append `?mobile=1` to the
 /// URL to force mobile mode in a desktop browser (layout preview / testing).
 let private isTouchDevice: bool =
-    emitJsExpr () "(window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || /[?&]mobile=1/.test(location.search)"
+    emitJsExpr
+        ()
+        "(window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || /[?&]mobile=1/.test(location.search)"
+
 let mutable private settings = Settings.defaultsForDevice isTouchDevice
 let mutable private rng = Random()
 /// Per-game random dealer shift: the first round's starter (the player next
 /// to the dealer) is drawn at game start instead of always seat 0.
 let mutable private dealerOffset = 0
 let mutable private textures: CardRenderer.CardTextures option = None
+
 /// Every deck style, loaded once; `textures` is the one the settings select.
-let mutable private decks: Map<Settings.CardStyle, CardRenderer.CardTextures> = Map.empty
+let mutable private decks: Map<Settings.CardStyle, CardRenderer.CardTextures> =
+    Map.empty
+
 let mutable private lastTime = 0.0
 
 /// Choose the card back for a new game: random scenic back if enabled,
 /// otherwise a single fixed back so it stays constant.
 let private applyCardBack (config: GameEngine.GameConfig) (tex: CardRenderer.CardTextures) =
-    if config.Settings.RandomCardBacks then CardRenderer.pickRandomBack rng tex
-    else CardRenderer.selectBack 0 tex
+    if config.Settings.RandomCardBacks then
+        CardRenderer.pickRandomBack rng tex
+    else
+        CardRenderer.selectBack 0 tex
 
 let private updateScreen (input: Input.InputState) (dt: float) =
     match screen with
     | Menu menuState ->
         let newMenu = MenuScreen.update input screenW screenH menuState
+
         match newMenu.Step with
         | MenuScreen.Ready ->
             let config: GameEngine.GameConfig =
-                { Variant = newMenu.Variant
-                  Seats = GameEngine.SeatCount.ofIntOrDefault newMenu.PlayerCount
-                  HumanCount = newMenu.HumanCount
-                  Seed = None
-                  TargetScore = 16
-                  Settings = settings }
+                {
+                    Variant = newMenu.Variant
+                    Seats = GameEngine.SeatCount.ofIntOrDefault newMenu.PlayerCount
+                    HumanCount = newMenu.HumanCount
+                    Seed = None
+                    TargetScore = 16
+                    Settings = settings
+                }
+
             rng <- Random()
             let players = GameEngine.createPlayers config
             dealerOffset <- rng.Next players.Length
             let scores = players |> List.map (fun p -> p.Name, 0) |> Map.ofList
-            let gameScreen = GameScreen.create config rng players 1 scores Scoring.CarryOver.zero dealerOffset
+
+            let gameScreen =
+                GameScreen.create config rng players 1 scores Scoring.CarryOver.zero dealerOffset
+
             textures |> Option.iter (applyCardBack config)
             screen <- Playing gameScreen
         | MenuScreen.ShowOptions ->
@@ -80,6 +96,7 @@ let private updateScreen (input: Input.InputState) (dt: float) =
                 | MenuScreen.PlayerCountSelect -> MenuScreen.PlayerCountSelect
                 | MenuScreen.HumanCountSelect -> MenuScreen.HumanCountSelect
                 | _ -> MenuScreen.VariantSelect
+
             let returnMenu = { newMenu with Step = prevStep }
             screen <- Options(OptionsScreen.create settings, Menu returnMenu)
         | MenuScreen.ShowRules ->
@@ -89,14 +106,20 @@ let private updateScreen (input: Input.InputState) (dt: float) =
                 | MenuScreen.PlayerCountSelect -> MenuScreen.PlayerCountSelect
                 | MenuScreen.HumanCountSelect -> MenuScreen.HumanCountSelect
                 | _ -> MenuScreen.VariantSelect
+
             let returnMenu = { newMenu with Step = prevStep }
             screen <- Rules(RulesScreen.create (), Menu returnMenu)
         | _ -> screen <- Menu newMenu
 
     | Playing gameState ->
         let newGameState = GameScreen.update input dt screenW screenH gameState
+
         if newGameState.ShowRulesClicked then
-            let cleanState = { newGameState with ShowRulesClicked = false }
+            let cleanState =
+                { newGameState with
+                    ShowRulesClicked = false
+                }
+
             screen <- Rules(RulesScreen.create (), Playing cleanState)
         elif newGameState.MenuClicked then
             screen <- Menu MenuScreen.initial
@@ -104,6 +127,7 @@ let private updateScreen (input: Input.InputState) (dt: float) =
             match newGameState.Phase with
             | GameScreen.RoundOver when newGameState.ContinueClicked ->
                 let finalState = newGameState.GameState
+
                 let scoreScreen =
                     ScoreScreen.create
                         finalState.Players
@@ -112,11 +136,13 @@ let private updateScreen (input: Input.InputState) (dt: float) =
                         newGameState.RoundNumber
                         newGameState.Config.TargetScore
                         newGameState.Carry
+
                 screen <- Scores scoreScreen
             | _ -> screen <- Playing newGameState
 
     | Scores scoreState ->
         let newScoreState = ScoreScreen.update input screenW screenH scoreState
+
         if newScoreState.ContinueClicked then
             match newScoreState.Phase with
             | ScoreScreen.GameOver -> screen <- Menu MenuScreen.initial
@@ -125,16 +151,29 @@ let private updateScreen (input: Input.InputState) (dt: float) =
                     newScoreState.Scores
                     |> List.filter (fun (p, _) -> p.Type = Human)
                     |> List.length
+
                 let config: GameEngine.GameConfig =
-                    { Variant = newScoreState.Variant
-                      Seats = GameEngine.SeatCount.ofIntOrDefault newScoreState.Scores.Length
-                      HumanCount = humanCount
-                      Seed = None
-                      TargetScore = newScoreState.TargetScore
-                      Settings = settings }
+                    {
+                        Variant = newScoreState.Variant
+                        Seats = GameEngine.SeatCount.ofIntOrDefault newScoreState.Scores.Length
+                        HumanCount = humanCount
+                        Seed = None
+                        TargetScore = newScoreState.TargetScore
+                        Settings = settings
+                    }
+
                 let players = newScoreState.Scores |> List.map fst
                 let nextRound = newScoreState.RoundNumber + 1
-                let gameScreen = GameScreen.create config rng players nextRound newScoreState.CumulativeScores newScoreState.CarryOut dealerOffset
+
+                let gameScreen =
+                    GameScreen.create
+                        config
+                        rng
+                        players
+                        nextRound
+                        newScoreState.CumulativeScores
+                        newScoreState.CarryOut
+                        dealerOffset
                 // Keep the same card back for every round of this game; the
                 // back is randomized only when a new game starts (from menu).
                 screen <- Playing gameScreen
@@ -143,11 +182,15 @@ let private updateScreen (input: Input.InputState) (dt: float) =
 
     | Rules(rulesState, returnTo) ->
         let newRules = RulesScreen.update input screenW screenH rulesState
-        if newRules.BackClicked then screen <- returnTo
-        else screen <- Rules(newRules, returnTo)
+
+        if newRules.BackClicked then
+            screen <- returnTo
+        else
+            screen <- Rules(newRules, returnTo)
 
     | Options(optionsState, returnTo) ->
         let newOptions = OptionsScreen.update input screenW screenH optionsState
+
         if newOptions.BackClicked then
             settings <- newOptions.Settings
             textures <- Map.tryFind settings.CardStyle decks
@@ -157,6 +200,7 @@ let private updateScreen (input: Input.InputState) (dt: float) =
 
 let private drawAll (g: Gfx) (input: Input.InputState) =
     Gfx.clear g screenW screenH (Color.rgb 25 50 35)
+
     match screen, textures with
     // The menu's ace fan always shows the original deck, whatever the card style.
     | Menu m, _ -> MenuScreen.draw g (Map.tryFind Settings.Realistic decks) input m screenW screenH
@@ -184,10 +228,13 @@ let private g = Gfx.create ctx
 // logical space in Input.fs.
 [<Literal>]
 let private baseLogicalHeight = 768
+
 [<Literal>]
 let private baseLogicalWidth = 1024
+
 [<Literal>]
 let private maxLogicalWidth = 2048
+
 [<Literal>]
 // Tall phones used to letterbox heavily at 1280; 1600 (a 16:25 board) lets
 // a portrait phone fill much more of its screen while every screen still
@@ -201,6 +248,7 @@ let private resize () =
     // keep the current size and wait for the resize event that follows.
     if vw > 0.0 && vh > 0.0 then
         let aspect = vw / vh
+
         let w, h =
             if aspect >= float baseLogicalWidth / float baseLogicalHeight then
                 // Wide: fixed height, width tracks the aspect (clamped)
@@ -210,6 +258,7 @@ let private resize () =
                 // Tall/square: fixed width, height tracks the aspect (clamped)
                 let h = int (round (float baseLogicalWidth / aspect)) |> min maxLogicalHeight
                 (baseLogicalWidth, h)
+
         screenW <- w
         screenH <- h
         // Mobile mode: the cards you play with are about twice as big (a bit
@@ -219,19 +268,23 @@ let private resize () =
         if isTouchDevice then
             CardRenderer.Scale <- (if h >= 1000 then 2.0 else 1.6)
             CardRenderer.UiScale <- 1.8
-            g.FontSize <- 28   // all UI text a notch larger on touch screens
+            g.FontSize <- 28 // all UI text a notch larger on touch screens
         else
             CardRenderer.Scale <- 1.0
             CardRenderer.UiScale <- 1.0
             g.FontSize <- 24
+
         CardRenderer.SmallScale <- 1.0
         // CSS box: fill the viewport while preserving the logical aspect
         // ratio. Within the clamps the logical aspect equals the viewport's,
         // so the board runs edge-to-edge.
         let logicalAspect = float w / float h
+
         let cssW, cssH =
-            if aspect > logicalAspect then (vh * logicalAspect, vh)
-            else (vw, vw / logicalAspect)
+            if aspect > logicalAspect then
+                (vh * logicalAspect, vh)
+            else
+                (vw, vw / logicalAspect)
         // Backing store at device resolution (capped at 2x) for crispness.
         let dpr = window.devicePixelRatio |> max 1.0 |> min 2.0
         let scale = cssH * dpr / float h
@@ -254,10 +307,17 @@ Input.init canvas
 for style in Settings.CardStyle.all do
     CardRenderer.loadAll style (fun tex ->
         decks <- Map.add style tex decks
-        if style = settings.CardStyle then textures <- Some tex)
+
+        if style = settings.CardStyle then
+            textures <- Some tex)
 
 let rec private loop (timestamp: float) =
-    let dt = if lastTime <= 0.0 then 0.0 else min 0.1 ((timestamp - lastTime) / 1000.0)
+    let dt =
+        if lastTime <= 0.0 then
+            0.0
+        else
+            min 0.1 ((timestamp - lastTime) / 1000.0)
+
     lastTime <- timestamp
     let input = Input.snapshot ()
     updateScreen input dt
