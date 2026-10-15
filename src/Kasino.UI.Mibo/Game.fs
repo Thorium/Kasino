@@ -15,22 +15,22 @@ open Kasino.Domain
 // active screen and bridges the screens, mirroring the transitions the
 // MonoGame build performed imperatively in KasinoGame.Update.
 //
-// The window is fixed 1024x768 (MonoGame windows aren't user-resizable by
-// default), so screen dimensions are constants rather than threaded from the
-// GameContext into every update.
+// The window is 1024x768 (MonoGame windows aren't user-resizable by default);
+// F11 switches to borderless fullscreen at the desktop resolution. The model
+// holds the current size and every screen lays out for it.
 // ─────────────────────────────────────────────────────────────
 
 module Game =
 
     [<Literal>]
     let WindowW = 1024
+
     [<Literal>]
     let WindowH = 768
 
     /// The MonoGame GraphicsDeviceManager, captured at composition time so F11
-    /// can toggle fullscreen. The backbuffer stays 1024x768 and is hardware-
-    /// scaled to the display, so layout and mouse hit-testing are unchanged.
-    let mutable private graphicsManager : GraphicsDeviceManager = Unchecked.defaultof<_>
+    /// can toggle fullscreen.
+    let mutable private graphicsManager: GraphicsDeviceManager = Unchecked.defaultof<_>
 
     /// The currently active screen; Rules/Options are overlays that remember
     /// the screen to return to (same shape as the MonoGame build).
@@ -42,17 +42,22 @@ module Game =
         | Options of OptionsScreen.OptionsState * ActiveScreen
 
     type Model =
-        { Screen: ActiveScreen
-          Settings: Settings.GameSettings
-          Rng: Random
-          /// Per-game random dealer shift: the first round's starter (the
-          /// player next to the dealer) is drawn at game start, not seat 0.
-          DealerOffset: int
-          /// Every deck style, loaded once; Textures is the one the settings select.
-          Decks: Map<Settings.CardStyle, CardRenderer.CardTextures>
-          Textures: CardRenderer.CardTextures option
-          Font: SpriteFont option
-          Input: Input.RawInput }
+        {
+            Screen: ActiveScreen
+            Settings: Settings.GameSettings
+            Rng: Random
+            /// Per-game random dealer shift: the first round's starter (the
+            /// player next to the dealer) is drawn at game start, not seat 0.
+            DealerOffset: int
+            /// Every deck style, loaded once; Textures is the one the settings select.
+            Decks: Map<Settings.CardStyle, CardRenderer.CardTextures>
+            Textures: CardRenderer.CardTextures option
+            Font: SpriteFont option
+            Input: Input.RawInput
+            /// The backbuffer size the screens lay out for.
+            ScreenW: int
+            ScreenH: int
+        }
 
     type Msg =
         | Tick of GameTime
@@ -62,17 +67,25 @@ module Game =
     /// Choose the card back for a new game: random scenic back if enabled,
     /// otherwise a fixed back so it stays constant.
     let private applyCardBack (rng: Random) (config: GameEngine.GameConfig) (tex: CardRenderer.CardTextures) =
-        if config.Settings.RandomCardBacks then CardRenderer.pickRandomBack rng tex
-        else CardRenderer.selectBack 0 tex
+        if config.Settings.RandomCardBacks then
+            CardRenderer.pickRandomBack rng tex
+        else
+            CardRenderer.selectBack 0 tex
 
     let private findContentDir () =
         let d = Path.Combine(AppContext.BaseDirectory, "Content")
-        if Directory.Exists d then d
+
+        if Directory.Exists d then
+            d
         else
             let alt = Path.Combine(Directory.GetCurrentDirectory(), "Content")
-            if Directory.Exists alt then alt
+
+            if Directory.Exists alt then
+                alt
             else
-                let src = Path.Combine(Directory.GetCurrentDirectory(), "src", "Kasino.UI.Mibo", "Content")
+                let src =
+                    Path.Combine(Directory.GetCurrentDirectory(), "src", "Kasino.UI.Mibo", "Content")
+
                 if Directory.Exists src then src else d
 
     // ── Init ──
@@ -81,14 +94,18 @@ module Game =
     /// loop only touches Textures/Font through Option, so this model is also
     /// the complete headless starting state.
     let private freshModel () =
-        { Screen = Menu MenuScreen.initial
-          Settings = Settings.defaultSettings
-          Rng = Random()
-          DealerOffset = 0
-          Decks = Map.empty
-          Textures = None
-          Font = None
-          Input = Input.emptyRaw }
+        {
+            Screen = Menu MenuScreen.initial
+            Settings = Settings.defaultSettings
+            Rng = Random()
+            DealerOffset = 0
+            Decks = Map.empty
+            Textures = None
+            Font = None
+            Input = Input.emptyRaw
+            ScreenW = WindowW
+            ScreenH = WindowH
+        }
 
     let init (ctx: GameContext) : struct (Model * Cmd<Msg>) =
         let device = MonoGameGameContext.getGraphicsDevice ctx
@@ -97,34 +114,52 @@ module Game =
         let assets = GameContext.getService<IAssets> ctx
         let font = assets.Font "fonts/UI"
         let fresh = freshModel ()
-        struct ({ fresh with Decks = decks; Textures = Map.tryFind fresh.Settings.CardStyle decks; Font = Some font }, Cmd.none)
+
+        struct ({ fresh with
+                    Decks = decks
+                    Textures = Map.tryFind fresh.Settings.CardStyle decks
+                    Font = Some font
+                },
+                Cmd.none)
 
     /// Init for the headless runtime: no window, no graphics services.
-    let initHeadless (_ctx: GameContext) : struct (Model * Cmd<Msg>) =
-        struct (freshModel (), Cmd.none)
+    let initHeadless (_ctx: GameContext) : struct (Model * Cmd<Msg>) = struct (freshModel (), Cmd.none)
 
     // ── Screen transitions (mirrors KasinoGame.Update) ──
     let private stepScreens (model: Model) (input: Input.InputState) (dt: float) : Model =
-        let w, h = WindowW, WindowH
+        let w, h = model.ScreenW, model.ScreenH
+
         match model.Screen with
         | Menu menuState ->
             let newMenu = MenuScreen.update input w h menuState
+
             match newMenu.Step with
             | MenuScreen.Ready ->
-                let config : GameEngine.GameConfig =
-                    { Variant = newMenu.Variant
-                      Seats = GameEngine.SeatCount.ofIntOrDefault newMenu.PlayerCount
-                      HumanCount = newMenu.HumanCount
-                      Seed = None
-                      TargetScore = 16
-                      Settings = model.Settings }
+                let config: GameEngine.GameConfig =
+                    {
+                        Variant = newMenu.Variant
+                        Seats = GameEngine.SeatCount.ofIntOrDefault newMenu.PlayerCount
+                        HumanCount = newMenu.HumanCount
+                        Seed = None
+                        TargetScore = 16
+                        Settings = model.Settings
+                    }
+
                 let rng = Random()
                 let players = GameEngine.createPlayers config
                 let dealerOffset = rng.Next players.Length
                 let scores = players |> List.map (fun p -> p.Name, 0) |> Map.ofList
-                let gameScreen = GameScreen.create config rng players 1 scores Scoring.CarryOver.zero dealerOffset
+
+                let gameScreen =
+                    GameScreen.create config rng players 1 scores Scoring.CarryOver.zero dealerOffset
+
                 model.Textures |> Option.iter (applyCardBack rng config)
-                { model with Screen = Playing gameScreen; Rng = rng; DealerOffset = dealerOffset }
+
+                { model with
+                    Screen = Playing gameScreen
+                    Rng = rng
+                    DealerOffset = dealerOffset
+                }
             | MenuScreen.ShowOptions ->
                 let prevStep =
                     match menuState.Step with
@@ -132,8 +167,12 @@ module Game =
                     | MenuScreen.PlayerCountSelect -> MenuScreen.PlayerCountSelect
                     | MenuScreen.HumanCountSelect -> MenuScreen.HumanCountSelect
                     | _ -> MenuScreen.VariantSelect
+
                 let returnMenu = { newMenu with Step = prevStep }
-                { model with Screen = Options (OptionsScreen.create model.Settings, Menu returnMenu) }
+
+                { model with
+                    Screen = Options(OptionsScreen.create model.Settings, Menu returnMenu)
+                }
             | MenuScreen.ShowRules ->
                 let prevStep =
                     match menuState.Step with
@@ -141,22 +180,35 @@ module Game =
                     | MenuScreen.PlayerCountSelect -> MenuScreen.PlayerCountSelect
                     | MenuScreen.HumanCountSelect -> MenuScreen.HumanCountSelect
                     | _ -> MenuScreen.VariantSelect
+
                 let returnMenu = { newMenu with Step = prevStep }
-                { model with Screen = Rules (RulesScreen.create (), Menu returnMenu) }
-            | _ ->
-                { model with Screen = Menu newMenu }
+
+                { model with
+                    Screen = Rules(RulesScreen.create (), Menu returnMenu)
+                }
+            | _ -> { model with Screen = Menu newMenu }
 
         | Playing gameState ->
             let newGameState = GameScreen.update input dt w h gameState
+
             if newGameState.ShowRulesClicked then
-                let cleanState = { newGameState with ShowRulesClicked = false }
-                { model with Screen = Rules (RulesScreen.create (), Playing cleanState) }
+                let cleanState =
+                    { newGameState with
+                        ShowRulesClicked = false
+                    }
+
+                { model with
+                    Screen = Rules(RulesScreen.create (), Playing cleanState)
+                }
             elif newGameState.MenuClicked then
-                { model with Screen = Menu MenuScreen.initial }
+                { model with
+                    Screen = Menu MenuScreen.initial
+                }
             else
                 match newGameState.Phase with
                 | GameScreen.RoundOver when newGameState.ContinueClicked ->
                     let finalState = newGameState.GameState
+
                     let scoreScreen =
                         ScoreScreen.create
                             finalState.Players
@@ -165,79 +217,173 @@ module Game =
                             newGameState.RoundNumber
                             newGameState.Config.TargetScore
                             newGameState.Carry
-                    { model with Screen = Scores scoreScreen }
+
+                    { model with
+                        Screen = Scores scoreScreen
+                    }
                 | _ ->
-                    { model with Screen = Playing newGameState }
+                    { model with
+                        Screen = Playing newGameState
+                    }
 
         | Scores scoreState ->
             let newScoreState = ScoreScreen.update input w h scoreState
+
             if newScoreState.ContinueClicked then
                 match newScoreState.Phase with
                 | ScoreScreen.GameOver ->
-                    { model with Screen = Menu MenuScreen.initial }
+                    { model with
+                        Screen = Menu MenuScreen.initial
+                    }
                 | ScoreScreen.RoundSummary ->
                     let humanCount =
                         newScoreState.Scores
                         |> List.filter (fun (p, _) -> p.Type = Human)
                         |> List.length
-                    let config : GameEngine.GameConfig =
-                        { Variant = newScoreState.Variant
-                          Seats = GameEngine.SeatCount.ofIntOrDefault newScoreState.Scores.Length
-                          HumanCount = humanCount
-                          Seed = None
-                          TargetScore = newScoreState.TargetScore
-                          Settings = model.Settings }
+
+                    let config: GameEngine.GameConfig =
+                        {
+                            Variant = newScoreState.Variant
+                            Seats = GameEngine.SeatCount.ofIntOrDefault newScoreState.Scores.Length
+                            HumanCount = humanCount
+                            Seed = None
+                            TargetScore = newScoreState.TargetScore
+                            Settings = model.Settings
+                        }
+
                     let players = newScoreState.Scores |> List.map fst
                     let nextRound = newScoreState.RoundNumber + 1
-                    let gameScreen = GameScreen.create config model.Rng players nextRound newScoreState.CumulativeScores newScoreState.CarryOut model.DealerOffset
-                    { model with Screen = Playing gameScreen }
+
+                    let gameScreen =
+                        GameScreen.create
+                            config
+                            model.Rng
+                            players
+                            nextRound
+                            newScoreState.CumulativeScores
+                            newScoreState.CarryOut
+                            model.DealerOffset
+
+                    { model with
+                        Screen = Playing gameScreen
+                    }
             else
-                { model with Screen = Scores newScoreState }
+                { model with
+                    Screen = Scores newScoreState
+                }
 
-        | Rules (rulesState, returnTo) ->
+        | Rules(rulesState, returnTo) ->
             let newRules = RulesScreen.update input w h rulesState
-            if newRules.BackClicked then { model with Screen = returnTo }
-            else { model with Screen = Rules (newRules, returnTo) }
 
-        | Options (optionsState, returnTo) ->
+            if newRules.BackClicked then
+                { model with Screen = returnTo }
+            else
+                { model with
+                    Screen = Rules(newRules, returnTo)
+                }
+
+        | Options(optionsState, returnTo) ->
             let newOptions = OptionsScreen.update input w h optionsState
+
             if newOptions.BackClicked then
                 // switch the active deck with the setting (headless runs have no decks)
                 let textures =
                     match Map.tryFind newOptions.Settings.CardStyle model.Decks with
                     | Some tex -> Some tex
                     | None -> model.Textures
-                { model with Settings = newOptions.Settings; Textures = textures; Screen = returnTo }
+
+                { model with
+                    Settings = newOptions.Settings
+                    Textures = textures
+                    Screen = returnTo
+                }
             else
-                { model with Screen = Options (newOptions, returnTo) }
+                { model with
+                    Screen = Options(newOptions, returnTo)
+                }
+
+    /// F11: borderless fullscreen at the desktop resolution, so the screens lay
+    /// out for the display's real shape (a hardware mode switch would pick a
+    /// 4:3 mode, stretched on a wide screen); F11 again returns to the window.
+    let private toggleFullscreen (model: Model) : Model =
+        if obj.ReferenceEquals(graphicsManager, null) then
+            model
+        else
+            let oldScale = CardRenderer.Scale
+
+            if graphicsManager.IsFullScreen then
+                graphicsManager.IsFullScreen <- false
+                graphicsManager.PreferredBackBufferWidth <- WindowW
+                graphicsManager.PreferredBackBufferHeight <- WindowH
+            else
+                let display = GraphicsAdapter.DefaultAdapter.CurrentDisplayMode
+                graphicsManager.HardwareModeSwitch <- false
+                graphicsManager.PreferredBackBufferWidth <- display.Width
+                graphicsManager.PreferredBackBufferHeight <- display.Height
+                graphicsManager.IsFullScreen <- true
+
+            graphicsManager.ApplyChanges()
+
+            let w, h =
+                graphicsManager.PreferredBackBufferWidth, graphicsManager.PreferredBackBufferHeight
+
+            CardRenderer.Scale <- float32 h / 768.0f
+            // table cards keep their place on the table
+            let rec rescale screen =
+                match screen with
+                | Playing g -> Playing(GameScreen.rescaleScatter model.ScreenW model.ScreenH oldScale w h g)
+                | Rules(r, back) -> Rules(r, rescale back)
+                | Options(o, back) -> Options(o, rescale back)
+                | other -> other
+
+            { model with
+                Screen = rescale model.Screen
+                ScreenW = w
+                ScreenH = h
+            }
 
     // ── Update ──
     let update (msg: Msg) (model: Model) : struct (Model * Cmd<Msg>) =
         match msg with
-        | MouseEvent d -> struct ({ model with Input = Input.applyMouse d model.Input }, Cmd.none)
-        | ActionsChanged s -> struct ({ model with Input = Input.applyActions s model.Input }, Cmd.none)
+        | MouseEvent d ->
+            struct ({ model with
+                        Input = Input.applyMouse d model.Input
+                    },
+                    Cmd.none)
+        | ActionsChanged s ->
+            struct ({ model with
+                        Input = Input.applyActions s model.Input
+                    },
+                    Cmd.none)
         | Tick gt ->
             let dt = gt.ElapsedGameTime.TotalSeconds
             let input = Input.project model.Input
             let screenAtStart = model.Screen
             let model2 = stepScreens model input dt
             // F11 toggles fullscreen (safe to ApplyChanges during Update).
-            if Input.has Input.ToggleFullscreen input && not (obj.ReferenceEquals(graphicsManager, null)) then
-                graphicsManager.IsFullScreen <- not graphicsManager.IsFullScreen
-                graphicsManager.ApplyChanges()
+            let model2 =
+                if Input.has Input.ToggleFullscreen input then
+                    toggleFullscreen model2
+                else
+                    model2
             // Back quits only when we began the frame already on the menu (so
             // an Escape that closed an overlay back to the menu doesn't also quit).
             let quit =
                 match screenAtStart with
                 | Menu _ when Input.has Input.Back input -> true
                 | _ -> false
-            let model3 = { model2 with Input = Input.clearEdges model2.Input }
+
+            let model3 =
+                { model2 with
+                    Input = Input.clearEdges model2.Input
+                }
+
             let cmd = if quit then Cmd.signalExit else Cmd.none
             struct (model3, cmd)
 
     // ── View ──
     let view (_ctx: GameContext) (model: Model) (buffer: RenderBuffer2D) =
-        let w, h = WindowW, WindowH
+        let w, h = model.ScreenW, model.ScreenH
         // Since Mibo 3.x sprites go through a SpriteBatch whose sampler the
         // renderer tracks per batch (default LinearClamp), so the 2.x-era
         // device-level PointClamp poke is both dead and unnecessary: the grey
@@ -248,6 +394,7 @@ module Game =
         match model.Font with
         | Some font ->
             let input = Input.project model.Input
+
             match model.Screen with
             // The menu's ace fan always shows the original deck, whatever the card style.
             | Menu m -> MenuScreen.draw buffer font (Map.tryFind Settings.Realistic model.Decks) input m w h
@@ -256,21 +403,24 @@ module Game =
                 | Some tex -> GameScreen.draw buffer font input tex g w h
                 | None -> ()
             | Scores s -> ScoreScreen.draw buffer font input s w h
-            | Rules (r, _) -> RulesScreen.draw buffer font model.Textures input r w h
-            | Options (o, _) -> OptionsScreen.draw buffer font (fun style -> Map.tryFind style model.Decks) input o w h
+            | Rules(r, _) -> RulesScreen.draw buffer font model.Textures input r w h
+            | Options(o, _) -> OptionsScreen.draw buffer font (fun style -> Map.tryFind style model.Decks) input o w h
         | None -> ()
 
     // ── Subscriptions ──
     let subscribe (ctx: GameContext) (_model: Model) : Sub<Msg> =
-        Sub.batch2(
-            Mouse.listen MouseEvent ctx,
-            InputMapper.subscribeStatic Input.uiMap ActionsChanged ctx)
+        Sub.batch2 (Mouse.listen MouseEvent ctx, InputMapper.subscribeStatic Input.uiMap ActionsChanged ctx)
 
     // ── Program composition ──
     let create () : MonoGameProgram<Model, Msg> =
         Program.mkProgram init update
         |> Program.withConfig (fun cfg ->
-            { cfg with Width = WindowW; Height = WindowH; Title = "Kasino - Finnish Card Game"; TargetFPS = 60 })
+            { cfg with
+                Width = WindowW
+                Height = WindowH
+                Title = "Kasino - Finnish Card Game"
+                TargetFPS = 60
+            })
         |> Program.withAssets
         |> Program.withInput
         |> Program.withSubscription subscribe
@@ -279,7 +429,11 @@ module Game =
         // felt table (the default config would clear to black and the view
         // would then have to paint the backdrop again itself).
         |> Program.withRenderer (fun () ->
-            Renderer2D.createWith { ClearColor = ValueSome (Color(25, 50, 35)) } view)
+            Renderer2D.createWith
+                {
+                    ClearColor = ValueSome(Color(25, 50, 35))
+                }
+                view)
         |> MonoGameProgram.ofProgram
         |> MonoGameProgram.withConfig (fun (game, deviceManager) ->
             game.Content.RootDirectory <- "Content"
@@ -289,5 +443,4 @@ module Game =
     /// tests and server-side simulation (Mibo headless mode). Input is injected
     /// by dispatching MouseEvent / ActionsChanged messages into the runner.
     let createHeadless () : HeadlessProgram<Model, Msg> =
-        HeadlessProgram.mkHeadless initHeadless update
-        |> HeadlessProgram.withTick Tick
+        HeadlessProgram.mkHeadless initHeadless update |> HeadlessProgram.withTick Tick

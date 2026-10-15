@@ -15,36 +15,43 @@ module Button =
 
     [<Literal>]
     let MinTouchHeight = 48
+
     [<Literal>]
     let MinTouchWidth = 120
 
     type ButtonDef =
-        { Rect: Rectangle
-          Text: string
-          BgColor: Color
-          HoverColor: Color
-          TextColor: Color }
+        {
+            Rect: Rectangle
+            Text: string
+            BgColor: Color
+            HoverColor: Color
+            TextColor: Color
+        }
 
     let create (text: string) (x: int) (y: int) (w: int) (h: int) (bgColor: Color) (textColor: Color) =
         let w = max w MinTouchWidth
         let h = max h MinTouchHeight
-        { Rect = Rectangle(x, y, w, h)
-          Text = text
-          BgColor = bgColor
-          HoverColor =
-              Color(min 255 (int bgColor.R + 40),
+
+        {
+            Rect = Rectangle(x, y, w, h)
+            Text = text
+            BgColor = bgColor
+            HoverColor =
+                Color(
+                    min 255 (int bgColor.R + 40),
                     min 255 (int bgColor.G + 40),
                     min 255 (int bgColor.B + 40),
-                    int bgColor.A)
-          TextColor = textColor }
+                    int bgColor.A
+                )
+            TextColor = textColor
+        }
 
     let createCentered (text: string) (screenW: int) (y: int) (w: int) (h: int) (bgColor: Color) (textColor: Color) =
         let w = max w MinTouchWidth
         let x = (screenW - w) / 2
         create text x y w h bgColor textColor
 
-    let isHovered (input: Input.InputState) (btn: ButtonDef) =
-        btn.Rect.Contains input.Mouse.Position
+    let isHovered (input: Input.InputState) (btn: ButtonDef) = btn.Rect.Contains input.Mouse.Position
 
     let isClicked (input: Input.InputState) (btn: ButtonDef) =
         btn.Rect.Contains(input.Mouse.Position) && input.Mouse.LeftJustClicked
@@ -53,7 +60,13 @@ module Button =
         buttons |> List.tryFindIndex (isClicked input)
 
     /// Draw a button starting at a base render-layer (bg / border / text stacked).
-    let drawAt (buffer: RenderBuffer2D) (baseLayer: int<RenderLayer>) (font: SpriteFont) (input: Input.InputState) (btn: ButtonDef) =
+    let drawAt
+        (buffer: RenderBuffer2D)
+        (baseLayer: int<RenderLayer>)
+        (font: SpriteFont)
+        (input: Input.InputState)
+        (btn: ButtonDef)
+        =
         let hover = isHovered input btn
         let bg = if hover then btn.HoverColor else btn.BgColor
         Render.fill buffer baseLayer bg btn.Rect
@@ -67,17 +80,29 @@ module Button =
     /// Draw a button whose label is a list of (text, color) segments rendered
     /// as one centered line. Used where parts of the label carry meaning by
     /// color (e.g. card names tinted by suit in the capture modal).
-    let drawSegmentedAt (buffer: RenderBuffer2D) (baseLayer: int<RenderLayer>) (font: SpriteFont) (input: Input.InputState) (btn: ButtonDef) (segments: (string * Color) list) =
+    let drawSegmentedAt
+        (buffer: RenderBuffer2D)
+        (baseLayer: int<RenderLayer>)
+        (font: SpriteFont)
+        (input: Input.InputState)
+        (btn: ButtonDef)
+        (segments: (string * Color) list)
+        =
         drawAt buffer baseLayer font input { btn with Text = "" }
         let totalW = segments |> List.sumBy (fun (s, _) -> (Render.measure font s).X)
         let lineH = (Render.measure font "Ag").Y
         let mutable x = float32 btn.Rect.X + (float32 btn.Rect.Width - totalW) / 2.0f
         let ty = float32 btn.Rect.Y + (float32 btn.Rect.Height - lineH) / 2.0f
+
         for (s, c) in segments do
             Render.text buffer (baseLayer + 2<RenderLayer>) font s (Vector2(x, ty)) c
             x <- x + (Render.measure font s).X
 
-    let draw buffer font input btn = drawAt buffer Render.LButton font input btn
-    let drawAll buffer font input (buttons: ButtonDef list) = buttons |> List.iter (draw buffer font input)
+    let draw buffer font input btn =
+        drawAt buffer Render.LButton font input btn
+
+    let drawAll buffer font input (buttons: ButtonDef list) =
+        buttons |> List.iter (draw buffer font input)
+
     let drawAllAt buffer baseLayer font input (buttons: ButtonDef list) =
         buttons |> List.iter (drawAt buffer baseLayer font input)

@@ -397,3 +397,28 @@ let ``recent-moves panel opens from the ? button and closes on any other click``
     match runner.Model.Screen with
     | Game.Playing g -> Assert.False(g.ShowRecentPlays)
     | other -> failwith $"expected Playing, got %A{other}"
+
+[<Fact>]
+let ``F11 rescale moves scattered table cards onto the wide table and back`` () =
+    let s = mkMultiCaptureScreen ()
+    let small = GameScreen.computeScatteredPositions s.GameState.Table 1024 768 Map.empty
+    let screen = { s with TableLayout = GameScreen.RandomScatter; ScatteredPositions = small }
+    let scale = CardRenderer.Scale
+    try
+        // fullscreen on a 5120x1440 display: the cards spread over the wide table
+        CardRenderer.Scale <- 1440.0f / 768.0f
+        let wide = GameScreen.rescaleScatter 1024 768 1.0f 5120 1440 screen
+        for KeyValue(_, (x, y, _)) in wide.ScatteredPositions do
+            Assert.InRange(x, 0, 5120)
+            Assert.InRange(y, 0, 1440)
+        Assert.True(wide.ScatteredPositions |> Map.exists (fun _ (x, _, _) -> x > 1024), "cards stayed in the 1024 px corner")
+        // back to the window: the cards return to where they were
+        CardRenderer.Scale <- 1.0f
+        let back = GameScreen.rescaleScatter 5120 1440 (1440.0f / 768.0f) 1024 768 wide
+        for KeyValue(card, (x, y, rot)) in back.ScatteredPositions do
+            let x0, y0, rot0 = small[card]
+            Assert.InRange(x, x0 - 2, x0 + 2)
+            Assert.InRange(y, y0 - 2, y0 + 2)
+            Assert.Equal(rot0, rot)
+    finally
+        CardRenderer.Scale <- scale
