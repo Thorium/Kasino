@@ -12,10 +12,22 @@ open Kasino.Domain
 module RulesScreen =
 
     [<Struct>]
-    type RulesState = { CurrentPage: int; BackClicked: bool }
+    type RulesState =
+        {
+            CurrentPage: int
+            BackClicked: bool
+            /// the variant of the game the rules were opened from; None from the menu
+            Playing: GameVariant option
+        }
 
-    let create () =
-        { CurrentPage = 0; BackClicked = false }
+    let createFor (playing: GameVariant option) =
+        {
+            CurrentPage = 0
+            BackClicked = false
+            Playing = playing
+        }
+
+    let create () = createFor None
 
     // ── Page model ──────────────────────────────────────
     // A page is either a block of text, or a visual page (drawn from
@@ -359,7 +371,14 @@ module RulesScreen =
 
         // header lines stack by font size (the base font is larger in mobile mode)
         let fs = g.FontSize
-        drawCentered "How to Play Kasino" 20 Color.Gold
+        // Header: opened from a game it names the variant being played - the
+        // table looks the same in both, and players forget which they chose
+        match state.Playing with
+        | Some StandardKasino ->
+            drawCentered "You are playing Standard Kasino, try to collect points" 20 Color.LimeGreen
+        | Some LaistoKasino -> drawCentered "You are playing Laistokasino, try to avoid points" 20 Color.LightSalmon
+        | None -> drawCentered "How to Play Kasino" 20 Color.Gold
+
         drawCentered (pageTitle state.CurrentPage) (20 + fs + 8) Color.White
         drawCentered (sprintf "Page %d / %d" (state.CurrentPage + 1) totalPages) (20 + 2 * fs + 10) Color.Gray
 

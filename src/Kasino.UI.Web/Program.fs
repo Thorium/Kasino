@@ -120,7 +120,7 @@ let private updateScreen (input: Input.InputState) (dt: float) =
                     ShowRulesClicked = false
                 }
 
-            screen <- Rules(RulesScreen.create (), Playing cleanState)
+            screen <- Rules(RulesScreen.createFor (Some cleanState.GameState.Variant), Playing cleanState)
         elif newGameState.MenuClicked then
             screen <- Menu MenuScreen.initial
         else

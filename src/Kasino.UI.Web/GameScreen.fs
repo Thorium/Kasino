@@ -92,6 +92,8 @@ module GameScreen =
             /// "Last moves" toggle: panel listing the other seats' recent plays
             ShowRecentPlays: bool
             MenuClicked: bool
+            /// the "quit this game?" prompt is open (Menu button or Escape)
+            ConfirmQuit: bool
             DragState: DragState
             TableLayout: TableLayout
             ScatteredPositions: Map<Card, (int * int * float)>
@@ -501,6 +503,25 @@ module GameScreen =
     let private menuButton (screenW: int) =
         Button.create "Menu" (screenW - 140) 20 120 48 (Color.rgb 120 40 40) Color.White
 
+    /// The "quit this game?" prompt's Yes / No buttons, centred under its
+    /// question - side by side, or stacked when the screen is too narrow for that
+    let private quitPromptButtons (screenW: int) (screenH: int) =
+        let s = CardRenderer.UiScale
+        let w, h, gap = int (200.0 * s), int (52.0 * s), int (30.0 * s)
+        let y = screenH / 2 + int (10.0 * s)
+        let yes = Button.create "Yes, quit" 0 0 w h (Color.rgb 120 40 40) Color.White
+        let no = Button.create "Keep playing" 0 0 w h (Color.rgb 40 100 40) Color.White
+
+        let at x y (b: Button.ButtonDef) =
+            { b with
+                Rect = { b.Rect with X = x; Y = y }
+            }
+
+        if 2 * w + 2 * gap <= screenW then
+            at (screenW / 2 - w - gap) y yes, at (screenW / 2 + gap) y no
+        else
+            at (screenW / 2 - w / 2) y yes, at (screenW / 2 - w / 2) (y + h + gap / 2) no
+
     /// "Last moves" toggle — panel listing what the other seats did since your play
     let private recentPlaysButton (_screenW: int) =
         Button.create "?" 20 20 120 48 (Color.rgb 60 70 110) Color.White
@@ -708,6 +729,7 @@ module GameScreen =
             ShowRulesClicked = false
             ShowRecentPlays = false
             MenuClicked = false
+            ConfirmQuit = false
             DragState = NotDragging
             TableLayout =
                 (if config.Settings.DefaultScatter then
@@ -901,7 +923,7 @@ module GameScreen =
     let private processHumanPlace (screen: ScreenState) (cardIndex: int) (screenW: int) (screenH: int) =
         finishHumanPlay screen cardIndex None (GameEngine.playHumanPlaceTurn screen.GameState cardIndex) screenW screenH
 
-    let update (input: Input.InputState) (dt: float) (screenW: int) (screenH: int) (screen: ScreenState) =
+    let private updateGame (input: Input.InputState) (dt: float) (screenW: int) (screenH: int) (screen: ScreenState) =
         let gs = screen.GameState
 
         // Fade out any active table-talk line.
@@ -957,7 +979,7 @@ module GameScreen =
         if not inCaptureModal && Button.isClicked input (helpButton screenW) then
             { screen with ShowRulesClicked = true }
         elif not inCaptureModal && Button.isClicked input (menuButton screenW) then
-            { screen with MenuClicked = true }
+            { screen with ConfirmQuit = true }
         elif not inCaptureModal && Button.isClicked input (recentPlaysButton screenW) then
             { screen with
                 ShowRecentPlays = not screen.ShowRecentPlays
@@ -981,7 +1003,7 @@ module GameScreen =
                 ScatteredPositions = newScatter
             }
         elif escapeToMenu then
-            { screen with MenuClicked = true }
+            { screen with ConfirmQuit = true }
         else
 
             match screen.Phase with
@@ -1086,7 +1108,7 @@ module GameScreen =
                                 CapturePreview = NoCapture
                             }
                         else
-                            { screen with MenuClicked = true }
+                            { screen with ConfirmQuit = true }
                     elif input.Keyboard.IsEnterPressed then
                         match screen.SelectedCardIndex with
                         | Some idx -> processHumanPlay screen idx screenW screenH
@@ -1391,6 +1413,25 @@ module GameScreen =
                     screen
 
             | GameOver -> screen
+
+    /// Advance the screen by one frame. The Menu button and Escape first open
+    /// the "quit this game?" prompt, which is modal: Yes (or Enter) leaves for
+    /// the menu, Keep playing (or Escape) resumes, and nothing moves meanwhile.
+    let update (input: Input.InputState) (dt: float) (screenW: int) (screenH: int) (screen: ScreenState) =
+        if screen.ConfirmQuit then
+            let yesButton, noButton = quitPromptButtons screenW screenH
+
+            if Button.isClicked input yesButton || input.Keyboard.IsEnterPressed then
+                { screen with
+                    ConfirmQuit = false
+                    MenuClicked = true
+                }
+            elif Button.isClicked input noButton || input.Keyboard.IsEscapePressed then
+                { screen with ConfirmQuit = false }
+            else
+                screen
+        else
+            updateGame input dt screenW screenH screen
 
     // ── Drawing ─────────────────────────────────────────────
     let private drawPlayerLabel (g: Gfx) (player: Player) (x: int) (y: int) (color: Color) =
@@ -1707,7 +1748,8 @@ module GameScreen =
 
         Gfx.fillText
             g
-            ($"R%d{screen.RoundNumber} Deal %d{gs.DealRound}/%d{gs.TotalDeals}")
+            // the variant first: the table looks the same in both, and players forget
+            ($"%s{GameVariant.shortName gs.Variant}  R%d{screen.RoundNumber} Deal %d{gs.DealRound}/%d{gs.TotalDeals}")
             (float scoreX)
             (float infoY)
             Color.LightGray
@@ -1914,3 +1956,47 @@ module GameScreen =
             g.FontSize <- baseFont
 
         | _ -> ()
+
+        // ── "Quit this game?" prompt, over everything else ──
+        if screen.ConfirmQuit then
+            Gfx.fillRect
+                g
+                {
+                    X = 0
+                    Y = 0
+                    Width = screenW
+                    Height = screenH
+                }
+                (Color.rgba 0 0 0 160)
+
+            let s = CardRenderer.UiScale
+            let panelW, panelH = min screenW (int (520.0 * s)), int (180.0 * s)
+
+            Gfx.fillRect
+                g
+                {
+                    X = screenW / 2 - panelW / 2
+                    Y = screenH / 2 - panelH / 2
+                    Width = panelW
+                    Height = panelH
+                }
+                (Color.rgb 20 40 30)
+
+            let baseFont = g.FontSize
+            g.FontSize <- int (float baseFont * s)
+
+            let drawCentered (text: string) (y: int) (color: Color) =
+                let size = Gfx.measure g text
+                Gfx.fillText g text (float screenW / 2.0 - size.X / 2.0) (float y) color
+
+            drawCentered "Quit this game and return to the menu?" (screenH / 2 - int (60.0 * s)) Color.Gold
+
+            drawCentered
+                (sprintf "The %s game in progress will be lost." (GameVariant.displayName gs.Variant))
+                (screenH / 2 - int (30.0 * s))
+                Color.LightGray
+
+            let yesButton, noButton = quitPromptButtons screenW screenH
+            Button.draw g input yesButton
+            Button.draw g input noButton
+            g.FontSize <- baseFont

@@ -293,7 +293,7 @@ type KasinoGame() as this =
                         ShowRulesClicked = false
                     }
 
-                screen <- Rules(RulesScreen.create (), Playing cleanState)
+                screen <- Rules(RulesScreen.createFor (Some cleanState.GameState.Variant), Playing cleanState)
             elif newGameState.MenuClicked then
                 // Return to main menu
                 screen <- Menu MenuScreen.initial
