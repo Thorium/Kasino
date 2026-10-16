@@ -12,10 +12,22 @@ open Kasino.Domain
 module RulesScreen =
 
     [<Struct>]
-    type RulesState = { CurrentPage: int; BackClicked: bool }
+    type RulesState =
+        {
+            CurrentPage: int
+            BackClicked: bool
+            /// the variant of the game the rules were opened from; None from the menu
+            Playing: GameVariant option
+        }
 
-    let create () =
-        { CurrentPage = 0; BackClicked = false }
+    let createFor (playing: GameVariant option) =
+        {
+            CurrentPage = 0
+            BackClicked = false
+            Playing = playing
+        }
+
+    let create () = createFor None
 
     type private Page =
         | TextPage of title: string * lines: string list
@@ -378,7 +390,14 @@ module RulesScreen =
         let drawCentered (text: string) (y: int) (color: Color) =
             Render.textCentered buffer Render.LLabel font text cx (float32 y) color
 
-        drawCentered "How to Play Kasino" 20 Color.Gold
+        // Header: opened from a game it names the variant being played - the
+        // table looks the same in both, and players forget which they chose
+        match state.Playing with
+        | Some StandardKasino ->
+            drawCentered "You are playing Standard Kasino, try to collect points" 20 Color.LimeGreen
+        | Some LaistoKasino -> drawCentered "You are playing Laistokasino, try to avoid points" 20 Color.LightSalmon
+        | None -> drawCentered "How to Play Kasino" 20 Color.Gold
+
         drawCentered (pageTitle state.CurrentPage) 55 Color.White
         drawCentered $"Page {state.CurrentPage + 1} / {totalPages}" 80 Color.Gray
 

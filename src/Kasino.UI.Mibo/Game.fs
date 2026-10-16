@@ -198,7 +198,7 @@ module Game =
                     }
 
                 { model with
-                    Screen = Rules(RulesScreen.create (), Playing cleanState)
+                    Screen = Rules(RulesScreen.createFor (Some cleanState.GameState.Variant), Playing cleanState)
                 }
             elif newGameState.MenuClicked then
                 { model with
