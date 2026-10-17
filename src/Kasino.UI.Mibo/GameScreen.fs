@@ -1880,7 +1880,7 @@ module GameScreen =
                 buffer
                 Render.LModalText
                 font
-                "Quit this game and return to the menu?"
+                "Do you want to quit?"
                 cx
                 (float32 (screenH / 2 - 60))
                 Color.Gold
@@ -1889,7 +1889,7 @@ module GameScreen =
                 buffer
                 Render.LModalText
                 font
-                $"The {GameVariant.displayName gs.Variant} game in progress will be lost."
+                $"Your {GameVariant.displayName gs.Variant} game will be lost."
                 cx
                 (float32 (screenH / 2 - 30))
                 Color.LightGray
