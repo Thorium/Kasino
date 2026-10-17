@@ -448,4 +448,5 @@ module RulesScreen =
 
         g.FontSize <- baseFont
 
-        drawCentered "Arrow keys: navigate  |  Esc: back" (screenH - 20) Color.DarkGray
+        // text draws downward from y, so keep a full line above the edge
+        drawCentered "Arrow keys: navigate  |  Esc: back" (screenH - g.FontSize - 4) Color.DarkGray

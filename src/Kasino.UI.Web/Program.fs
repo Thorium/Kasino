@@ -236,10 +236,11 @@ let private baseLogicalWidth = 1024
 let private maxLogicalWidth = 2048
 
 [<Literal>]
-// Tall phones used to letterbox heavily at 1280; 1600 (a 16:25 board) lets
-// a portrait phone fill much more of its screen while every screen still
+// Tall phones used to letterbox heavily at 1280, and still did at 1600 once
+// the game ran as a Home Screen app (full 19.5:9 screen); 2240 covers that
+// aspect, so a portrait phone fills its screen while every screen still
 // lays out top- and bottom-anchored.
-let private maxLogicalHeight = 1600
+let private maxLogicalHeight = 2240
 
 let private resize () =
     let vw = window.innerWidth

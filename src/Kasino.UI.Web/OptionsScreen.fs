@@ -219,4 +219,5 @@ module OptionsScreen =
                 Gfx.drawImage g (CardRenderer.getTexture tex card) (x0 + i * (w + 12)) y0 w h
         | None -> ()
 
-        drawCentered "Esc: back" (screenH - 20) Color.DarkGray
+        // text draws downward from y, so keep a full line above the edge
+        drawCentered "Esc: back" (screenH - g.FontSize - 4) Color.DarkGray

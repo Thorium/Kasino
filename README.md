@@ -90,10 +90,6 @@ dotnet run --project src/Kasino.UI/Kasino.UI.fsproj
 dotnet test
 ```
 
-## Desktop version
-
-<img width="1027" height="801" alt="image" src="https://github.com/user-attachments/assets/0a4b7471-8de5-483b-8fd7-e68045f1671b" />
-
 ## Web version (Fable + Canvas)
 
 `src/Kasino.UI.Web` is a [Fable](https://fable.io/) front-end that reuses
@@ -117,6 +113,3 @@ npm run build                        # production build into dist/
 It deploys automatically to GitHub Pages on every push to `main` via
 `.github/workflows/deploy.yml`. Enable **Settings → Pages → Source: GitHub
 Actions** in the repository to publish it.
-
-<img width="664" height="375" alt="image" src="https://github.com/user-attachments/assets/225361e7-f736-4c2c-86c9-021c2a126ab7" />
-

@@ -142,6 +142,11 @@ module GameScreen =
         let totalW = count * (cardW + cardGap) - cardGap
         (screenW - totalW) / 2
 
+    /// Extra room under the bottom hand in mobile mode, where the larger text
+    /// of the "Cards / Sweeps" label would otherwise overlap the cards.
+    let private handLabelRoom () =
+        if CardRenderer.UiScale > 1.0 then 24 else 0
+
     /// Hand card rectangle. The bottom (your) hand uses the interactive card
     /// size; the top opponent's hand uses the small size.
     let private handCardRect (screenW: int) (screenH: int) (handSize: int) (idx: int) (isBottom: bool) =
@@ -152,7 +157,11 @@ module GameScreen =
                 CardRenderer.smallWidth (), CardRenderer.smallHeight ()
 
         let x = centerCards screenW handSize cw + idx * (cw + cardGap)
-        let y = if isBottom then screenH - ch - 20 else 20
+        let y =
+            if isBottom then
+                screenH - ch - 20 - handLabelRoom ()
+            else
+                20
 
         {
             X = x
@@ -242,7 +251,7 @@ module GameScreen =
             X = sideMargin
             Y = sch + 60
             Width = screenW - 2 * sideMargin
-            Height = screenH - (sch + 60) - (ch + 80)
+            Height = screenH - (sch + 60) - (ch + 80 + handLabelRoom ())
         }
 
     /// Compute scattered positions for table cards, placed center-outward.
@@ -375,7 +384,10 @@ module GameScreen =
             match seatOf playerCount bottomIdx idx with
             | SeatBottom ->
                 let handY =
-                    float (screenH - CardRenderer.scaledHeight () - 20 + CardRenderer.scaledHeight () / 2)
+                    float (
+                        screenH - CardRenderer.scaledHeight () - 20 - handLabelRoom ()
+                        + CardRenderer.scaledHeight () / 2
+                    )
 
                 (float (screenW / 2), handY)
             | SeatTop ->
@@ -482,7 +494,7 @@ module GameScreen =
         Button.createCentered
             label
             screenW
-            (screenH - CardRenderer.scaledHeight () - int (80.0 * s))
+            (screenH - CardRenderer.scaledHeight () - int (80.0 * s) - handLabelRoom ())
             (int (240.0 * s))
             (int (52.0 * s))
             color
@@ -547,7 +559,7 @@ module GameScreen =
         Button.create
             "Place Instead"
             (screenW / 2 + int (130.0 * s))
-            (screenH - CardRenderer.scaledHeight () - int (80.0 * s))
+            (screenH - CardRenderer.scaledHeight () - int (80.0 * s) - handLabelRoom ())
             (int (170.0 * s))
             (int (52.0 * s))
             (Color.rgb 100 100 100)
@@ -1727,37 +1739,48 @@ module GameScreen =
         | None -> ()
 
         // ── Scoreboard (top-right) ──
-        let scoreX = screenW - 200
+        let scoreLines =
+            gs.Players
+            |> List.map (fun p ->
+                let cumScore =
+                    screen.CumulativeScores |> Map.tryFind p.Name |> Option.defaultValue 0
+
+                $"%s{p.Name}: %d{cumScore}")
+
+        // the variant first: the table looks the same in both, and players forget
+        let infoText =
+            $"%s{GameVariant.shortName gs.Variant}  R%d{screen.RoundNumber} Deal %d{gs.DealRound}/%d{gs.TotalDeals}"
+
+        // Right-aligned block, so the larger mobile-mode text and long names
+        // stay on screen; line spacing follows the font size.
+        let widest =
+            "Scores:" :: infoText :: scoreLines
+            |> List.map (fun t -> int (Gfx.measure g t).X)
+            |> List.max
+
+        let scoreX = min (screenW - 200) (screenW - 20 - widest)
         let scoreStartY = sch + 50
         Gfx.fillText g "Scores:" (float scoreX) (float scoreStartY) Color.Gold
 
-        gs.Players
-        |> List.iteri (fun i p ->
-            let cumScore =
-                screen.CumulativeScores |> Map.tryFind p.Name |> Option.defaultValue 0
-
+        scoreLines
+        |> List.iteri (fun i line ->
             Gfx.fillText
                 g
-                ($"%s{p.Name}: %d{cumScore}")
+                line
                 (float scoreX)
                 (float (scoreStartY + g.FontSize + i * (g.FontSize - 2)))
                 Color.White)
 
-        let infoY = scoreStartY + 24 + gs.Players.Length * 22 + 8
-        let deckCount = List.length gs.Deck
+        let infoY =
+            scoreStartY + g.FontSize + gs.Players.Length * (g.FontSize - 2) + 8
 
-        Gfx.fillText
-            g
-            // the variant first: the table looks the same in both, and players forget
-            ($"%s{GameVariant.shortName gs.Variant}  R%d{screen.RoundNumber} Deal %d{gs.DealRound}/%d{gs.TotalDeals}")
-            (float scoreX)
-            (float infoY)
-            Color.LightGray
+        let deckCount = List.length gs.Deck
+        Gfx.fillText g infoText (float scoreX) (float infoY) Color.LightGray
 
         let deckIconW = cw / 2
         let deckIconH = ch / 2
         let deckIconX = scoreX
-        let deckIconY = infoY + 26
+        let deckIconY = infoY + g.FontSize + 2
         // no deck image once the last wave has been drawn (nothing left to draw)
         if deckCount > 0 then
             Gfx.drawImage g textures.Back deckIconX deckIconY deckIconW deckIconH
