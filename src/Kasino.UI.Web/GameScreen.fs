@@ -1989,10 +1989,11 @@ module GameScreen =
                 let size = Gfx.measure g text
                 Gfx.fillText g text (float screenW / 2.0 - size.X / 2.0) (float y) color
 
-            drawCentered "Quit this game and return to the menu?" (screenH / 2 - int (60.0 * s)) Color.Gold
+            // two short lines, so the prompt fits a phone-width canvas
+            drawCentered "Do you want to quit?" (screenH / 2 - int (60.0 * s)) Color.Gold
 
             drawCentered
-                (sprintf "The %s game in progress will be lost." (GameVariant.displayName gs.Variant))
+                (sprintf "Your %s game will be lost." (GameVariant.displayName gs.Variant))
                 (screenH / 2 - int (30.0 * s))
                 Color.LightGray
 

@@ -1978,10 +1978,10 @@ module GameScreen =
                 sb.DrawString(font, text, Vector2(float32 screenW / 2.0f - size.X / 2.0f, float32 y), color)
                 |> ignore
 
-            drawCentered "Quit this game and return to the menu?" (screenH / 2 - 60) Color.Gold
+            drawCentered "Do you want to quit?" (screenH / 2 - 60) Color.Gold
 
             drawCentered
-                $"The {GameVariant.displayName gs.Variant} game in progress will be lost."
+                $"Your {GameVariant.displayName gs.Variant} game will be lost."
                 (screenH / 2 - 30)
                 Color.LightGray
 
